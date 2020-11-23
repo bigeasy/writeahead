@@ -1,0 +1,35 @@
+{
+    "name":                 "delineate",
+    "version":              "0.0.1",
+    "description":
+
+      "A write-ahead log.",
+
+    "keywords":
+    [
+                            "btree", "leveldb", "indexeddb", "levelup",
+                            "binary", "mvcc", "database", "json", "b-tree",
+                            "concurrent", "persistence", "strata", "memento"
+    ],
+    "author":               "Alan Gutierrez <alan@prettyrobots.com>",
+    "homepage":             "https://bigeasy.github.io/advance",
+    "bugs":                 "https://github.com/bigeasy/advance/issues",
+    "license":              "MIT",
+    "repository":
+    {
+                            "type": "git",
+                            "url": "bigeasy/delineate"
+    },
+    "dependencies":
+    {
+    },
+    "devDependencies":
+    {
+                            "proof":                        "^9.0.2"
+    },
+    "main":                 "delineate",
+    "scripts":
+    {
+                            "test": "proof test/*.t.js"
+    }
+}
