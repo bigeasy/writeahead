@@ -1,5 +1,5 @@
 {
-    "name":                 "delineate",
+    "name":                 "writeahead",
     "version":              "0.0.1",
     "description":
 
@@ -18,7 +18,7 @@
     "repository":
     {
                             "type": "git",
-                            "url": "bigeasy/delineate"
+                            "url": "bigeasy/writeahead"
     },
     "dependencies":
     {
@@ -27,7 +27,7 @@
     {
                             "proof":                        "^9.0.2"
     },
-    "main":                 "delineate",
+    "main":                 "writeahead",
     "scripts":
     {
                             "test": "proof test/*.t.js"
