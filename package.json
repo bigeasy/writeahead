@@ -7,9 +7,9 @@
 
     "keywords":
     [
-                            "btree", "leveldb", "indexeddb", "levelup",
-                            "binary", "mvcc", "database", "json", "b-tree",
-                            "concurrent", "persistence", "strata", "memento"
+                            "btree", "leveldb", "indexeddb", "levelup", "binary",
+                            "mvcc", "database", "json", "b-tree", "concurrent",
+                            "persistence", "strata", "memento"
     ],
     "author":               "Alan Gutierrez <alan@prettyrobots.com>",
     "homepage":             "https://bigeasy.github.io/advance",
@@ -22,6 +22,9 @@
     },
     "dependencies":
     {
+                            "interrupt":                    "11.0.0-alpha.5",
+                            "keyify":                       "2.0.5",
+                            "transcript":                   "0.1.3"
     },
     "devDependencies":
     {
