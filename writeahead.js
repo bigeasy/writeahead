@@ -32,9 +32,10 @@ class WriteAhead {
     })
 
     static Stream = class extends Readable {
-        constructor (writeahead, key) {
+        constructor (writeahead, key, poker = null) {
             super()
             this.writeahead = writeahead
+            this._pokers = { $pokers: poker == null ? [] : [ poker ] }
             this._index = 0
             this._keyified = Keyify.stringify(key)
             this.key = key
@@ -42,16 +43,14 @@ class WriteAhead {
             this._logs = this.writeahead._logs.slice()
             this._remainder = Buffer.alloc(0)
             this._player = new Player(this.writeahead._checksum)
-            this._log = 0
+            this._log = null
             this._filename = null
         }
 
         _calledback (error, ...vargs) {
             const continued = vargs.pop()
             if (error != null) {
-                debugger
-                vargs.unshift({ '#callee': WriteAhead.Stream.prototype._calledback })
-                this.destroy(new WriteAhead.Error(WriteAhead.Error.options.apply(WriteAhead.Error, vargs)))
+                this.destroy(error)
             } else {
                 try {
                     continued.apply(this, vargs)
@@ -61,44 +60,49 @@ class WriteAhead {
             }
         }
 
-        _read () {
+        __read (options, poker) {
+            const merged = WriteAhead.Error.options(options, { $pokers: poker })
             if (this._blocks.length == 0) {
                 if (this._fd != null) {
-                    fileSystem.close(this._fd, (error) => {
-                        this._calledback(error, 'CLOSE_ERROR', [ error ], { filename: this._filename }, () => {
+                    fileSystem.close(this._fd, WriteAhead.Error.callback(merged, 'CLOSE_ERROR', { filename: this._filename }, $ => $(), (error, options) => {
+                        this._calledback(error, () => {
                             this._fd = null
-                            this._read()
+                            this.__read(options, $ => $())
                         })
-                    })
+                    }))
                 } else {
                     if (this._index == this.writeahead._logs.length) {
                         this.push(null)
                     } else {
                         this._log = this.writeahead._logs[this._index++]
-                        this._blocks = this.writeahead._blocks[this._log][this._keyified].slice()
-                        this._read()
+                        this._blocks = this.writeahead._blocks[this._log.id][this._keyified].slice()
+                        this.__read(merged, $ => $())
                     }
                 }
             } else if (this._fd == null) {
-                this._filename = path.join(this.writeahead.directory, String(this._log))
-                fileSystem.open(this._filename, 'r', (error, fd) => {
-                    this._calledback(error, 'OPEN_ERROR', [ error ], { filename: this._filename }, () => {
+                this._filename = path.join(this.writeahead.directory, String(this._log.id))
+                fileSystem.open(this._filename, 'r', WriteAhead.Error.callback(merged, 'OPEN_ERROR', { filename: this._filename }, $ => $(), (error, fd, options) => {
+                    this._calledback(error, () => {
                         this._fd = fd
-                        this._read()
+                        this.__read(options, $ => $())
                     })
-                })
+                }))
             } else {
                 const block = this._blocks.shift()
                 const buffer = Buffer.alloc(block.length)
-                fileSystem.read(this._fd, buffer, 0, buffer.length, block.position, (error, read) => {
-                    this._calledback(error, 'READ_ERROR', [ error ], { filename: this._filename }, () => {
+                fileSystem.read(this._fd, buffer, 0, buffer.length, block.position, WriteAhead.Error.callback(merged, 'READ_ERROR', { filename: this._filename }, $ => $(), (error, read) => {
+                    this._calledback(error, () => {
                         WriteAhead.Error.assert(read == buffer.length, 'BLOCK_SHORT_READ')
                         const entries = this._player.split(buffer)
                         WriteAhead.Error.assert(entries.length == 1, 'BLOCK_MISSING')
                         this.push(entries[0].parts[1])
                     })
-                })
+                }))
             }
+        }
+
+        _read () {
+            this.__read(this._pokers, $ => $())
         }
 
         _destroy (error, callback) {
@@ -123,20 +127,20 @@ class WriteAhead {
         this._checksum = checksum
         if (this._logs.length == 0) {
             this._blocks[0] = []
-            this._logs.push(0)
+            this._logs.push({ id: 0, readers: 0, shifted: false })
         }
     }
 
     static async open ({ directory, checksum = () => 0 }, converter) {
         const dir = await fs.readdir(directory)
-        const logs = dir.filter(file => /^\d+$/.test(file))
-                        .map(log => +log)
-                        .sort((left, right) => left - right)
+        const ids = dir.filter(file => /^\d+$/.test(file))
+                       .map(log => +log)
+                       .sort((left, right) => left - right)
         const player = new Player(checksum)
         const blocks = {}
-        for (const log of logs) {
-            blocks[log] = {}
-            const readable = fileSystem.createReadStream(path.join(directory, String(log)))
+        for (const id of ids) {
+            blocks[id] = {}
+            const readable = fileSystem.createReadStream(path.join(directory, String(id)))
             let position = 0, remainder = 0
             for await (const block of readable) {
                 let offset = 0
@@ -149,8 +153,8 @@ class WriteAhead {
                                      .map(key => Keyify.stringify(key))
                     const length = entry.sizes.reduce((sum, value) => sum + value, 0)
                     for (const key of keys) {
-                        blocks[log][key] || (blocks[log][key] = [])
-                        blocks[log][key].push({ position, length })
+                        blocks[id][key] || (blocks[id][key] = [])
+                        blocks[id][key].push({ position, length })
                     }
                     position += length
                     offset += length - remainder
@@ -159,6 +163,7 @@ class WriteAhead {
                 remainder = block.length - offset
             }
         }
+        const logs = ids.map(id => ({ id, readers: 0, shifted: false }))
         return new WriteAhead({ directory, logs, checksum, blocks })
     }
 
@@ -175,7 +180,7 @@ class WriteAhead {
     async write (entries, converter) {
         const { _recorder: recorder } = this
         const log = this._logs[this._logs.length - 1]
-        const filename = path.join(this.directory, String(log))
+        const filename = path.join(this.directory, String(log.id))
         const handle = await fs.open(filename, 'a')
         try {
             const stat = await handle.stat()
@@ -195,8 +200,8 @@ class WriteAhead {
             await handle.appendFile(Buffer.concat(buffers))
             await handle.sync()
             for (const key in positions) {
-                this._blocks[log][key] || (this._blocks[log][key] = [])
-                this._blocks[log][key].push.apply(this._blocks[log][key], positions[key])
+                this._blocks[log.id][key] || (this._blocks[log.id][key] = [])
+                this._blocks[log.id][key].push.apply(this._blocks[log.id][key], positions[key])
             }
         } finally {
             await handle.close()
@@ -204,11 +209,11 @@ class WriteAhead {
     }
 
     async rotate () {
-        const log = this._logs[this._logs.length - 1] + 1
-        const filename = path.join(this.directory, String(log))
+        const log = { id: this._logs[this._logs.length - 1].id + 1, readers: 0, shifted: false }
+        const filename = path.join(this.directory, String(log.id))
         await fs.writeFile(filename, '', { flags: 'wx' })
         this._logs.push(log)
-        this._blocks[log] = []
+        this._blocks[log.id] = []
     }
 
     async shift () {
@@ -225,7 +230,7 @@ class WriteAhead {
         }
         */
         const log = this._logs.shift()
-        const filename = path.join(this.directory, String(log))
+        const filename = path.join(this.directory, String(log.id))
         await fs.unlink(filename)
         return true
     }

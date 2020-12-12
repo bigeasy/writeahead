@@ -13,6 +13,14 @@ require('proof')(11, async okay => {
     await fs.rmdir(directory, { recursive: true })
     await fs.mkdir(directory, { recursive: true })
 
+    const Interrupt = require('interrupt')
+
+    Interrupt.audit = function (error, errors) {
+        if (error instanceof WriteAhead.Error && errors.length) {
+            throw new Error
+        }
+    }
+
     const writes = [{
         version: 0,
         nodes: [{
@@ -55,7 +63,7 @@ require('proof')(11, async okay => {
 
         await writeahead.write(writes, writable)
 
-        const readable = new WriteAhead.Stream(writeahead, 0)
+        const readable = new WriteAhead.Stream(writeahead, 0, $ => $())
 
         const player = new Player(() => 0), gathered = []
         for await (const block of readable) {
@@ -278,7 +286,7 @@ require('proof')(11, async okay => {
 
         await writeahead.write(writes, writable)
 
-        const readable = new WriteAhead.Stream(writeahead, 0)
+        const readable = new WriteAhead.Stream(writeahead, 0, $ => $())
 
         await fs.unlink(path.join(__dirname, 'tmp', 'writeahead', '0'))
 
@@ -294,6 +302,7 @@ require('proof')(11, async okay => {
                 }
             }
         } catch (error) {
+            console.log(error.stack)
             errors.push(error.code)
         }
 
