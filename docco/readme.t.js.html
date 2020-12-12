@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>readme.t.js</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page_wrapper">
+            <div id="jump_page">
+
+
+                <a class="source" href="readme.t.js.html">
+                  readme.t.js
+                </a>
+
+
+                <a class="source" href="writeahead.js.html">
+                  writeahead.js
+                </a>
+
+            </div>
+          </div>
+        </li>
+      </ul>
+
+    <ul class="sections">
+
+          <li id="title">
+              <div class="annotation">
+                  <h1>readme.t.js</h1>
+              </div>
+          </li>
+
+
+
+        <li id="section-1">
+            <div class="annotation">
+
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+
+            </div>
+
+            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;proof&#x27;</span>)(<span class="hljs-number">11</span>, <span class="hljs-keyword">async</span> okay =&gt; {
+    <span class="hljs-keyword">const</span> WriteAhead = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;..&#x27;</span>)
+
+    <span class="hljs-keyword">const</span> { Recorder, Player } = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;transcript&#x27;</span>)
+
+    <span class="hljs-keyword">const</span> recorder = Recorder.create(<span class="hljs-function">() =&gt;</span> <span class="hljs-number">0</span>)
+
+    <span class="hljs-keyword">const</span> path = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;path&#x27;</span>)
+    <span class="hljs-keyword">const</span> fs = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;fs&#x27;</span>).promises
+
+    <span class="hljs-keyword">const</span> directory = path.join(__dirname, <span class="hljs-string">&#x27;tmp&#x27;</span>, <span class="hljs-string">&#x27;writeahead&#x27;</span>)
+
+    <span class="hljs-keyword">await</span> fs.rmdir(directory, { <span class="hljs-attr">recursive</span>: <span class="hljs-literal">true</span> })
+    <span class="hljs-keyword">await</span> fs.mkdir(directory, { <span class="hljs-attr">recursive</span>: <span class="hljs-literal">true</span> })
+
+    <span class="hljs-keyword">const</span> writes = [{
+        <span class="hljs-attr">version</span>: <span class="hljs-number">0</span>,
+        <span class="hljs-attr">nodes</span>: [{
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>,
+            <span class="hljs-attr">node</span>: <span class="hljs-number">1</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>,
+            <span class="hljs-attr">node</span>: <span class="hljs-number">2</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">1</span>,
+            <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }]
+    }, {
+        <span class="hljs-attr">version</span>: <span class="hljs-number">2</span>,
+        <span class="hljs-attr">nodes</span>: [{
+            <span class="hljs-attr">page</span>: <span class="hljs-number">1</span>,
+            <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }]
+    }, {
+        <span class="hljs-attr">version</span>: <span class="hljs-number">3</span>,
+        <span class="hljs-attr">nodes</span>: [{
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>,
+            <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }]
+    }]
+
+    <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">writable</span> (<span class="hljs-params">entry</span>) </span>{
+        <span class="hljs-keyword">const</span> pages = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Set</span>
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> node <span class="hljs-keyword">of</span> entry.nodes) {
+            pages.add(node.page)
+        }
+        <span class="hljs-keyword">return</span> {
+            <span class="hljs-attr">keys</span>: [...pages],
+            <span class="hljs-attr">body</span>: recorder([ entry.nodes.map(<span class="hljs-function"><span class="hljs-params">node</span> =&gt;</span> Buffer.from(<span class="hljs-built_in">JSON</span>.stringify(node))) ])
+        }
+    }
+
+    {
+        <span class="hljs-keyword">const</span> writeahead = <span class="hljs-keyword">await</span> WriteAhead.open({ directory })
+
+        <span class="hljs-keyword">await</span> writeahead.write(writes, writable)
+
+        <span class="hljs-keyword">const</span> readable = <span class="hljs-keyword">new</span> WriteAhead.Stream(writeahead, <span class="hljs-number">0</span>, $ =&gt; $())
+
+        <span class="hljs-keyword">const</span> player = <span class="hljs-keyword">new</span> Player(<span class="hljs-function">() =&gt;</span> <span class="hljs-number">0</span>), gathered = []
+        <span class="hljs-keyword">for</span> <span class="hljs-keyword">await</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> readable) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> player.split(block)) {
+                <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> node <span class="hljs-keyword">of</span> entry.parts.map(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> <span class="hljs-built_in">JSON</span>.parse(<span class="hljs-built_in">String</span>(part)))) {
+                    gathered.push(node)
+                }
+            }
+        }
+
+        okay(gathered, [{
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">1</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">2</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }], <span class="hljs-string">&#x27;write&#x27;</span>)
+    }
+
+    {
+        <span class="hljs-keyword">const</span> writeahead = <span class="hljs-keyword">await</span> WriteAhead.open({ directory })
+
+        <span class="hljs-keyword">const</span> readable = <span class="hljs-keyword">new</span> WriteAhead.Stream(writeahead, <span class="hljs-number">0</span>)
+
+        <span class="hljs-keyword">const</span> player = <span class="hljs-keyword">new</span> Player(<span class="hljs-function">() =&gt;</span> <span class="hljs-number">0</span>), gathered = []
+        <span class="hljs-keyword">for</span> <span class="hljs-keyword">await</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> readable) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> player.split(block)) {
+                <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> node <span class="hljs-keyword">of</span> entry.parts.map(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> <span class="hljs-built_in">JSON</span>.parse(<span class="hljs-built_in">String</span>(part)))) {
+                    gathered.push(node)
+                }
+            }
+        }
+
+        okay(gathered, [{
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">1</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">2</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }], <span class="hljs-string">&#x27;reopened&#x27;</span>)
+    }
+
+    {
+        <span class="hljs-keyword">const</span> writeahead = <span class="hljs-keyword">await</span> WriteAhead.open({ directory })
+
+        <span class="hljs-keyword">await</span> writeahead.rotate()
+
+        <span class="hljs-keyword">await</span> writeahead.write([{
+            <span class="hljs-attr">version</span>: <span class="hljs-number">3</span>,
+            <span class="hljs-attr">nodes</span>: [{
+                <span class="hljs-attr">page</span>: <span class="hljs-number">2</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">0</span>
+            }, {
+                <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">4</span>
+            }]
+        }].concat(writes), writable)
+
+        <span class="hljs-keyword">const</span> readable = <span class="hljs-keyword">new</span> WriteAhead.Stream(writeahead, <span class="hljs-number">0</span>)
+
+        <span class="hljs-keyword">const</span> player = <span class="hljs-keyword">new</span> Player(<span class="hljs-function">() =&gt;</span> <span class="hljs-number">0</span>), gathered = []
+        <span class="hljs-keyword">for</span> <span class="hljs-keyword">await</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> readable) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> player.split(block)) {
+                <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> node <span class="hljs-keyword">of</span> entry.parts.map(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> <span class="hljs-built_in">JSON</span>.parse(<span class="hljs-built_in">String</span>(part)))) {
+                    gathered.push(node)
+                }
+            }
+        }
+
+        okay(gathered, [{
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">1</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">2</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">2</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">0</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">4</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">1</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">2</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }], <span class="hljs-string">&#x27;rotated&#x27;</span>)
+    }
+
+    {
+        <span class="hljs-keyword">const</span> writeahead = <span class="hljs-keyword">await</span> WriteAhead.open({ directory })
+
+        <span class="hljs-keyword">const</span> readable = <span class="hljs-keyword">new</span> WriteAhead.Stream(writeahead, <span class="hljs-number">0</span>)
+
+        <span class="hljs-keyword">const</span> player = <span class="hljs-keyword">new</span> Player(<span class="hljs-function">() =&gt;</span> <span class="hljs-number">0</span>), gathered = []
+        <span class="hljs-keyword">for</span> <span class="hljs-keyword">await</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> readable) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> player.split(block)) {
+                <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> node <span class="hljs-keyword">of</span> entry.parts.map(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> <span class="hljs-built_in">JSON</span>.parse(<span class="hljs-built_in">String</span>(part)))) {
+                    gathered.push(node)
+                }
+            }
+        }
+
+        okay(gathered, [{
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">1</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">2</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">2</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">0</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">4</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">1</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">2</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }], <span class="hljs-string">&#x27;rotated reopened&#x27;</span>)
+
+        <span class="hljs-keyword">await</span> writeahead.shift()
+
+        {
+            <span class="hljs-keyword">const</span> readable = <span class="hljs-keyword">new</span> WriteAhead.Stream(writeahead, <span class="hljs-number">0</span>)
+            gathered.length = <span class="hljs-number">0</span>
+            <span class="hljs-keyword">for</span> <span class="hljs-keyword">await</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> readable) {
+                <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> player.split(block)) {
+                    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> node <span class="hljs-keyword">of</span> entry.parts.map(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> <span class="hljs-built_in">JSON</span>.parse(<span class="hljs-built_in">String</span>(part)))) {
+                        gathered.push(node)
+                    }
+                }
+            }
+        }
+
+        okay(gathered, [{
+            <span class="hljs-attr">page</span>: <span class="hljs-number">2</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">0</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">4</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">1</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">2</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }], <span class="hljs-string">&#x27;shifted&#x27;</span>)
+    }
+
+    {
+        <span class="hljs-keyword">const</span> writeahead = <span class="hljs-keyword">await</span> WriteAhead.open({ directory })
+
+        <span class="hljs-keyword">const</span> readable = <span class="hljs-keyword">new</span> WriteAhead.Stream(writeahead, <span class="hljs-number">0</span>)
+
+        <span class="hljs-keyword">const</span> player = <span class="hljs-keyword">new</span> Player(<span class="hljs-function">() =&gt;</span> <span class="hljs-number">0</span>), gathered = []
+        <span class="hljs-keyword">for</span> <span class="hljs-keyword">await</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> readable) {
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> player.split(block)) {
+                <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> node <span class="hljs-keyword">of</span> entry.parts.map(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> <span class="hljs-built_in">JSON</span>.parse(<span class="hljs-built_in">String</span>(part)))) {
+                    gathered.push(node)
+                }
+            }
+        }
+
+        okay(gathered, [{
+            <span class="hljs-attr">page</span>: <span class="hljs-number">2</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">0</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">4</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">1</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">2</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">1</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }, {
+            <span class="hljs-attr">page</span>: <span class="hljs-number">0</span>, <span class="hljs-attr">node</span>: <span class="hljs-number">3</span>
+        }], <span class="hljs-string">&#x27;shifted reopened&#x27;</span>)
+
+        <span class="hljs-keyword">await</span> writeahead.shift()
+
+        {
+            <span class="hljs-keyword">const</span> readable = <span class="hljs-keyword">new</span> WriteAhead.Stream(writeahead, <span class="hljs-number">0</span>)
+            gathered.length = <span class="hljs-number">0</span>
+            <span class="hljs-keyword">for</span> <span class="hljs-keyword">await</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> readable) {
+                <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> player.split(block)) {
+                    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> node <span class="hljs-keyword">of</span> entry.parts.map(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> <span class="hljs-built_in">JSON</span>.parse(<span class="hljs-built_in">String</span>(part)))) {
+                        gathered.push(node)
+                    }
+                }
+            }
+        }
+
+        okay(gathered, [], <span class="hljs-string">&#x27;shifted to empty&#x27;</span>)
+
+        <span class="hljs-keyword">await</span> writeahead.shift()
+    }
+
+    {
+        <span class="hljs-keyword">const</span> writeahead = <span class="hljs-keyword">await</span> WriteAhead.open({ directory })
+
+        <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">writable</span> (<span class="hljs-params">entry</span>) </span>{
+            <span class="hljs-keyword">const</span> pages = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Set</span>
+            <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> node <span class="hljs-keyword">of</span> entry.nodes) {
+                pages.add(node.page)
+            }
+            <span class="hljs-keyword">return</span> {
+                <span class="hljs-attr">keys</span>: [...pages],
+                <span class="hljs-attr">body</span>: recorder([ entry.nodes.map(<span class="hljs-function"><span class="hljs-params">node</span> =&gt;</span> Buffer.from(<span class="hljs-built_in">JSON</span>.stringify(node))) ])
+            }
+        }
+
+        <span class="hljs-keyword">await</span> writeahead.write(writes, writable)
+
+        <span class="hljs-keyword">const</span> readable = <span class="hljs-keyword">new</span> WriteAhead.Stream(writeahead, <span class="hljs-number">0</span>)
+
+        <span class="hljs-keyword">await</span> fs.unlink(path.join(__dirname, <span class="hljs-string">&#x27;tmp&#x27;</span>, <span class="hljs-string">&#x27;writeahead&#x27;</span>, <span class="hljs-string">&#x27;0&#x27;</span>))
+
+        <span class="hljs-keyword">const</span> errors = []
+
+        <span class="hljs-keyword">try</span> {
+            <span class="hljs-keyword">const</span> player = <span class="hljs-keyword">new</span> Player(<span class="hljs-function">() =&gt;</span> <span class="hljs-number">0</span>), gathered = []
+            <span class="hljs-keyword">for</span> <span class="hljs-keyword">await</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> readable) {
+                <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> player.split(block)) {
+                    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> node <span class="hljs-keyword">of</span> entry.parts.map(<span class="hljs-function"><span class="hljs-params">part</span> =&gt;</span> <span class="hljs-built_in">JSON</span>.parse(<span class="hljs-built_in">String</span>(part)))) {
+                        gathered.push(node)
+                    }
+                }
+            }
+        } <span class="hljs-keyword">catch</span> (error) {
+            errors.push(error.code)
+        }
+
+        okay(errors, [ <span class="hljs-string">&#x27;IO_ERROR&#x27;</span> ], <span class="hljs-string">&#x27;open error&#x27;</span>)
+    }
+
+    {
+        <span class="hljs-keyword">const</span> writeahead = <span class="hljs-keyword">await</span> WriteAhead.open({ directory })
+
+        <span class="hljs-keyword">await</span> writeahead.write(writes, writable)
+
+        <span class="hljs-keyword">const</span> readable = <span class="hljs-keyword">new</span> WriteAhead.Stream(writeahead, <span class="hljs-number">0</span>)
+
+        <span class="hljs-keyword">const</span> errors = []
+
+        <span class="hljs-keyword">const</span> player = <span class="hljs-keyword">new</span> Player(<span class="hljs-function">() =&gt;</span> <span class="hljs-number">0</span>), gathered = []
+
+        <span class="hljs-keyword">try</span> {
+            <span class="hljs-keyword">for</span> <span class="hljs-keyword">await</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> readable) {
+                <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> entry <span class="hljs-keyword">of</span> player.split(block)) {
+                    readable.destroy(<span class="hljs-keyword">new</span> <span class="hljs-built_in">Error</span>(<span class="hljs-string">&#x27;foo&#x27;</span>))
+                }
+            }
+        } <span class="hljs-keyword">catch</span> (error) {
+            errors.push(error.message)
+        }
+
+        okay(errors, [ <span class="hljs-string">&#x27;foo&#x27;</span> ], <span class="hljs-string">&#x27;user initiated destroy with error&#x27;</span>)
+    }</pre></div></div>
+
+        </li>
+
+
+        <li id="section-2">
+            <div class="annotation">
+
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-2">&#182;</a>
+              </div>
+              <p>Checking to make sure the above behavior is correct.</p>
+
+            </div>
+
+            <div class="content"><div class='highlight'><pre>    {
+        <span class="hljs-keyword">const</span> fileSystem = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;fs&#x27;</span>)
+        <span class="hljs-keyword">const</span> readable = fileSystem.createReadStream(__filename)
+        <span class="hljs-keyword">try</span> {
+            <span class="hljs-keyword">for</span> <span class="hljs-keyword">await</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> readable) {
+                readable.destroy(<span class="hljs-keyword">new</span> <span class="hljs-built_in">Error</span>(<span class="hljs-string">&#x27;oof&#x27;</span>))
+            }
+        } <span class="hljs-keyword">catch</span> (error) {
+            <span class="hljs-built_in">console</span>.log(error.stack)
+        }
+    }
+
+    {
+        <span class="hljs-keyword">const</span> writeahead = <span class="hljs-keyword">await</span> WriteAhead.open({ directory })
+
+        <span class="hljs-keyword">await</span> writeahead.write(writes, writable)
+
+        <span class="hljs-keyword">const</span> readable = <span class="hljs-keyword">new</span> WriteAhead.Stream(writeahead, <span class="hljs-number">0</span>)
+
+        <span class="hljs-keyword">const</span> player = <span class="hljs-keyword">new</span> Player(<span class="hljs-function">() =&gt;</span> <span class="hljs-number">0</span>), gathered = []
+        <span class="hljs-keyword">const</span> iterator = readable[<span class="hljs-built_in">Symbol</span>.asyncIterator]()
+        <span class="hljs-keyword">await</span> iterator.next()
+        <span class="hljs-keyword">await</span> <span class="hljs-keyword">new</span> <span class="hljs-built_in">Promise</span>(<span class="hljs-function">(<span class="hljs-params">resolve, reject</span>) =&gt;</span> {
+            <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;fs&#x27;</span>).close(readable._fd, <span class="hljs-function"><span class="hljs-params">error</span> =&gt;</span> {
+                <span class="hljs-keyword">if</span> (error) {
+                    reject(error)
+                } <span class="hljs-keyword">else</span> {
+                    resolve()
+                }
+            })
+        })
+        readable.destroy()
+        <span class="hljs-keyword">const</span> error = <span class="hljs-keyword">await</span> <span class="hljs-keyword">new</span> <span class="hljs-built_in">Promise</span>(<span class="hljs-function"><span class="hljs-params">resolve</span> =&gt;</span> readable.once(<span class="hljs-string">&#x27;error&#x27;</span>, resolve))
+        okay(error.code, <span class="hljs-string">&#x27;EBADF&#x27;</span>, <span class="hljs-string">&#x27;destroy with bad close&#x27;</span>)
+    }
+
+    {
+        <span class="hljs-keyword">const</span> writeahead = <span class="hljs-keyword">await</span> WriteAhead.open({ directory })
+        writeahead._blocks[<span class="hljs-number">0</span>][<span class="hljs-number">0</span>][<span class="hljs-number">0</span>].length = <span class="hljs-number">0</span>
+        <span class="hljs-keyword">const</span> readable = <span class="hljs-keyword">new</span> WriteAhead.Stream(writeahead, <span class="hljs-number">0</span>), errors = []
+        <span class="hljs-keyword">try</span> {
+            <span class="hljs-keyword">const</span> player = <span class="hljs-keyword">new</span> Player(<span class="hljs-function">() =&gt;</span> <span class="hljs-number">0</span>)
+            <span class="hljs-keyword">for</span> <span class="hljs-keyword">await</span> (<span class="hljs-keyword">const</span> block <span class="hljs-keyword">of</span> readable) {
+            }
+        } <span class="hljs-keyword">catch</span> (error) {
+            errors.push(error.code)
+        }
+        okay(errors, [ <span class="hljs-string">&#x27;IO_ERROR&#x27;</span> ], <span class="hljs-string">&#x27;assertion error&#x27;</span>)
+    }
+})</pre></div></div>
+
+        </li>
+
+    </ul>
+  </div>
+</body>
+</html>
