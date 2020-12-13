@@ -31,94 +31,6 @@ class WriteAhead {
         }
     })
 
-    static Stream = class extends Readable {
-        constructor (writeahead, key, poker = null) {
-            super()
-            this.writeahead = writeahead
-            this._pokers = { $pokers: poker == null ? [] : [ poker ] }
-            this._index = 0
-            this._keyified = Keyify.stringify(key)
-            this.key = key
-            this._blocks = []
-            this._logs = this.writeahead._logs.slice()
-            this._remainder = Buffer.alloc(0)
-            this._player = new Player(this.writeahead._checksum)
-            this._log = null
-            this._filename = null
-        }
-
-        _calledback (error, ...vargs) {
-            const continued = vargs.pop()
-            if (error != null) {
-                this.destroy(error)
-            } else {
-                try {
-                    continued.apply(this, vargs)
-                } catch (error) {
-                    this.destroy(error)
-                }
-            }
-        }
-
-        __read (options, poker) {
-            const merged = WriteAhead.Error.options(options, { $pokers: poker })
-            if (this._blocks.length == 0) {
-                if (this._fd != null) {
-                    fileSystem.close(this._fd, WriteAhead.Error.callback(merged, 'CLOSE_ERROR', { filename: this._filename }, $ => $(), (error, options) => {
-                        this._calledback(error, () => {
-                            this._fd = null
-                            this.__read(options, $ => $())
-                        })
-                    }))
-                } else {
-                    if (this._index == this.writeahead._logs.length) {
-                        this.push(null)
-                    } else {
-                        this._log = this.writeahead._logs[this._index++]
-                        this._blocks = this.writeahead._blocks[this._log.id][this._keyified].slice()
-                        this.__read(merged, $ => $())
-                    }
-                }
-            } else if (this._fd == null) {
-                this._filename = path.join(this.writeahead.directory, String(this._log.id))
-                fileSystem.open(this._filename, 'r', WriteAhead.Error.callback(merged, 'OPEN_ERROR', { filename: this._filename }, $ => $(), (error, fd, options) => {
-                    this._calledback(error, () => {
-                        this._fd = fd
-                        this.__read(options, $ => $())
-                    })
-                }))
-            } else {
-                const block = this._blocks.shift()
-                const buffer = Buffer.alloc(block.length)
-                fileSystem.read(this._fd, buffer, 0, buffer.length, block.position, WriteAhead.Error.callback(merged, 'READ_ERROR', { filename: this._filename }, $ => $(), (error, read) => {
-                    this._calledback(error, () => {
-                        WriteAhead.Error.assert(read == buffer.length, 'BLOCK_SHORT_READ')
-                        const entries = this._player.split(buffer)
-                        WriteAhead.Error.assert(entries.length == 1, 'BLOCK_MISSING')
-                        this.push(entries[0].parts[1])
-                    })
-                }))
-            }
-        }
-
-        _read () {
-            this.__read(this._pokers, $ => $())
-        }
-
-        _destroy (error, callback) {
-            if (this._fd != null) {
-                fileSystem.close(this._fd, e => {
-                    this._fd = null
-                    this._destroy(e || error, callback)
-                })
-            } else if (error) {
-                callback(error)
-            } else {
-                callback()
-            }
-        }
-    }
-
     constructor ({ directory, logs, checksum, blocks }) {
         this.directory = directory
         this._logs = logs
@@ -131,7 +43,7 @@ class WriteAhead {
         }
     }
 
-    static async open ({ directory, checksum = () => 0 }, converter) {
+    static async open ({ directory, checksum = () => 0 }) {
         const dir = await fs.readdir(directory)
         const ids = dir.filter(file => /^\d+$/.test(file))
                        .map(log => +log)
@@ -165,6 +77,42 @@ class WriteAhead {
         }
         const logs = ids.map(id => ({ id, readers: 0, shifted: false }))
         return new WriteAhead({ directory, logs, checksum, blocks })
+    }
+    //
+
+    // Returns an asynchronous iterator over the blocks for the given key.
+
+    //
+    read (key) {
+        const writeahead = this
+        const player = new Player(this._checksum)
+        const keyified = Keyify.stringify(key)
+        const logs = this._logs.slice()
+        let index = 0
+        return async function* () {
+            if (index == logs.length) {
+                return
+            }
+            do {
+                const log = writeahead._logs[index++]
+                const blocks = writeahead._blocks[log.id][keyified].slice()
+                const filename = path.join(writeahead.directory, String(log.id))
+                const handle = await WriteAhead.Error.resolve(fs.open(filename, 'r'), 'OPEN_ERROR', { filename })
+                try {
+                    while (blocks.length != 0) {
+                        const block = blocks.shift()
+                        const buffer = Buffer.alloc(block.length)
+                        const { bytesRead } = await WriteAhead.Error.resolve(handle.read(buffer, 0, buffer.length, block.position), 'READ_ERROR', { filename })
+                        WriteAhead.Error.assert(bytesRead == buffer.length, 'BLOCK_SHORT_READ', { filename })
+                        const entries = player.split(buffer)
+                        WriteAhead.Error.assert(entries.length == 1, 'BLOCK_MISSING', { filename })
+                        yield entries[0].parts[1]
+                    }
+                } finally {
+                    await WriteAhead.Error.resolve(handle.close(), 'CLOSE_ERROR', { filename })
+                }
+            } while (index != logs.length)
+        } ()
     }
 
     // Write a batch of entries to the write-ahead log. `entries` is an array of
