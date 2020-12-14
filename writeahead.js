@@ -7,6 +7,7 @@ const { Readable } = require('stream')
 const Interrupt = require('interrupt')
 const assert = require('assert')
 const coalesce = require('extant')
+const Sequester = require('sequester')
 
 let latch
 
@@ -39,7 +40,11 @@ class WriteAhead {
         this._checksum = checksum
         if (this._logs.length == 0) {
             this._blocks[0] = []
-            this._logs.push({ id: 0, readers: 0, shifted: false })
+            this._logs.push({
+                id: 0,
+                shifted: false,
+                sequester: new Sequester
+            })
         }
     }
 
@@ -75,7 +80,7 @@ class WriteAhead {
                 remainder = block.length - offset
             }
         }
-        const logs = ids.map(id => ({ id, readers: 0, shifted: false }))
+        const logs = ids.map(id => ({ id, shifted: false, sequester: new Sequester }))
         return new WriteAhead({ directory, logs, checksum, blocks })
     }
     //
@@ -85,33 +90,41 @@ class WriteAhead {
     //
     read (key) {
         const writeahead = this
-        const player = new Player(this._checksum)
-        const keyified = Keyify.stringify(key)
-        const logs = this._logs.slice()
-        let index = 0
         return async function* () {
-            if (index == logs.length) {
-                return
+            const keyified = Keyify.stringify(key)
+            const player = new Player(writeahead._checksum)
+            const shared = writeahead._logs.slice()
+            let index = 0
+            for (const log of shared) {
+                await log.sequester.share()
             }
-            do {
-                const log = writeahead._logs[index++]
-                const blocks = writeahead._blocks[log.id][keyified].slice()
-                const filename = path.join(writeahead.directory, String(log.id))
-                const handle = await WriteAhead.Error.resolve(fs.open(filename, 'r'), 'OPEN_ERROR', { filename })
-                try {
-                    while (blocks.length != 0) {
-                        const block = blocks.shift()
-                        const buffer = Buffer.alloc(block.length)
-                        const { bytesRead } = await WriteAhead.Error.resolve(handle.read(buffer, 0, buffer.length, block.position), 'READ_ERROR', { filename })
-                        WriteAhead.Error.assert(bytesRead == buffer.length, 'BLOCK_SHORT_READ', { filename })
-                        const entries = player.split(buffer)
-                        WriteAhead.Error.assert(entries.length == 1, 'BLOCK_MISSING', { filename })
-                        yield entries[0].parts[1]
-                    }
-                } finally {
-                    await WriteAhead.Error.resolve(handle.close(), 'CLOSE_ERROR', { filename })
+            const logs = shared.filter(log => ! log.shifted)
+            try {
+                if (index == logs.length) {
+                    return
                 }
-            } while (index != logs.length)
+                do {
+                    const log = writeahead._logs[index++]
+                    const blocks = writeahead._blocks[log.id][keyified].slice()
+                    const filename = path.join(writeahead.directory, String(log.id))
+                    const handle = await WriteAhead.Error.resolve(fs.open(filename, 'r'), 'OPEN_ERROR', { filename })
+                    try {
+                        while (blocks.length != 0) {
+                            const block = blocks.shift()
+                            const buffer = Buffer.alloc(block.length)
+                            const { bytesRead } = await WriteAhead.Error.resolve(handle.read(buffer, 0, buffer.length, block.position), 'READ_ERROR', { filename })
+                            WriteAhead.Error.assert(bytesRead == buffer.length, 'BLOCK_SHORT_READ', { filename })
+                            const entries = player.split(buffer)
+                            WriteAhead.Error.assert(entries.length == 1, 'BLOCK_MISSING', { filename })
+                            yield entries[0].parts[1]
+                        }
+                    } finally {
+                        await WriteAhead.Error.resolve(handle.close(), 'CLOSE_ERROR', { filename })
+                    }
+                } while (index != logs.length)
+            } finally {
+                shared.map(log => log.sequester.unlock())
+            }
         } ()
     }
 
@@ -157,7 +170,11 @@ class WriteAhead {
     }
 
     async rotate () {
-        const log = { id: this._logs[this._logs.length - 1].id + 1, readers: 0, shifted: false }
+        const log = {
+            id: this._logs[this._logs.length - 1].id + 1,
+            shifted: false,
+            sequester: new Sequester
+        }
         const filename = path.join(this.directory, String(log.id))
         await fs.writeFile(filename, '', { flags: 'wx' })
         this._logs.push(log)
@@ -168,16 +185,10 @@ class WriteAhead {
         if (this._logs.length == 0) {
             return false
         }
-        /*
-        if (this._logs[0].readers != 0) {
-            this._logs[0].latch = {
-                promise: new Promise(resolve => latch = { resolve }),
-                ...latch
-            }
-            await this._logs[0].latch.promise
-        }
-        */
+        await this._logs[0].sequester.exclude()
         const log = this._logs.shift()
+        log.shifted = true
+        log.sequester.unlock()
         const filename = path.join(this.directory, String(log.id))
         await fs.unlink(filename)
         return true
