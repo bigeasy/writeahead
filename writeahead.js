@@ -88,44 +88,41 @@ class WriteAhead {
     // Returns an asynchronous iterator over the blocks for the given key.
 
     //
-    read (key) {
-        const writeahead = this
-        return async function* () {
-            const keyified = Keyify.stringify(key)
-            const player = new Player(writeahead._checksum)
-            const shared = writeahead._logs.slice()
-            let index = 0
-            for (const log of shared) {
-                await log.sequester.share()
+    async *read (key) {
+        const keyified = Keyify.stringify(key)
+        const player = new Player(this._checksum)
+        const shared = this._logs.slice()
+        let index = 0
+        for (const log of shared) {
+            await log.sequester.share()
+        }
+        const logs = shared.filter(log => ! log.shifted)
+        try {
+            if (index == logs.length) {
+                return
             }
-            const logs = shared.filter(log => ! log.shifted)
-            try {
-                if (index == logs.length) {
-                    return
-                }
-                do {
-                    const log = writeahead._logs[index++]
-                    const blocks = writeahead._blocks[log.id][keyified].slice()
-                    const filename = path.join(writeahead.directory, String(log.id))
-                    const handle = await WriteAhead.Error.resolve(fs.open(filename, 'r'), 'OPEN_ERROR', { filename })
-                    try {
-                        while (blocks.length != 0) {
-                            const block = blocks.shift()
-                            const buffer = Buffer.alloc(block.length)
-                            const { bytesRead } = await WriteAhead.Error.resolve(handle.read(buffer, 0, buffer.length, block.position), 'READ_ERROR', { filename })
-                            WriteAhead.Error.assert(bytesRead == buffer.length, 'BLOCK_SHORT_READ', { filename })
-                            const entries = player.split(buffer)
-                            WriteAhead.Error.assert(entries.length == 1, 'BLOCK_MISSING', { filename })
-                            yield entries[0].parts[1]
-                        }
-                    } finally {
-                        await WriteAhead.Error.resolve(handle.close(), 'CLOSE_ERROR', { filename })
+            do {
+                const log = this._logs[index++]
+                const blocks = this._blocks[log.id][keyified].slice()
+                const filename = path.join(this.directory, String(log.id))
+                const handle = await WriteAhead.Error.resolve(fs.open(filename, 'r'), 'OPEN_ERROR', { filename })
+                try {
+                    while (blocks.length != 0) {
+                        const block = blocks.shift()
+                        const buffer = Buffer.alloc(block.length)
+                        const { bytesRead } = await WriteAhead.Error.resolve(handle.read(buffer, 0, buffer.length, block.position), 'READ_ERROR', { filename })
+                        WriteAhead.Error.assert(bytesRead == buffer.length, 'BLOCK_SHORT_READ', { filename })
+                        const entries = player.split(buffer)
+                        WriteAhead.Error.assert(entries.length == 1, 'BLOCK_MISSING', { filename })
+                        yield entries[0].parts[1]
                     }
-                } while (index != logs.length)
-            } finally {
-                shared.map(log => log.sequester.unlock())
-            }
-        } ()
+                } finally {
+                    await WriteAhead.Error.resolve(handle.close(), 'CLOSE_ERROR', { filename })
+                }
+            } while (index != logs.length)
+        } finally {
+            shared.map(log => log.sequester.unlock())
+        }
     }
 
     // Write a batch of entries to the write-ahead log. `entries` is an array of
