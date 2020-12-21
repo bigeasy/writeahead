@@ -135,7 +135,7 @@ class WriteAhead {
     // out the relevant content from the body for a given key.
 
     //
-    async write (entries, converter) {
+    async write (entries) {
         const { _recorder: recorder } = this
         const log = this._logs[this._logs.length - 1]
         const filename = path.join(this.directory, String(log.id))
@@ -145,7 +145,7 @@ class WriteAhead {
             let position = stat.size
             const buffers = [], positions = {}
             for (const entry of entries) {
-                const { keys, body } = converter(entry)
+                const { keys, body } = entry
                 const keyified = keys.map(key => Keyify.stringify(key))
                 const block = recorder([[ Buffer.from(JSON.stringify(keys)) ], [ body ]])
                 for (const key of keyified) {

@@ -54,60 +54,6 @@ require('proof')(8, async okay => {
     }
     //
 
-    // Some example records. We imagine that we are writing out records that
-    // have entries that are going to be grouped by a page number. Here the
-    // version represents the write we want to commit, it will always increase
-    // in value. The nodes represent that atomic transaction across multiple
-    // pages that must entirely succeed or entirely fail.
-
-    //
-    const writes = [{
-        version: 0,
-        nodes: [{
-            page: 0,
-            node: 1
-        }, {
-            page: 0,
-            node: 2
-        }, {
-            page: 1,
-            node: 3
-        }]
-    }, {
-        version: 2,
-        nodes: [{
-            page: 1,
-            node: 3
-        }]
-    }, {
-        version: 3,
-        nodes: [{
-            page: 0,
-            node: 3
-        }]
-    }]
-    //
-
-    // This is a user `coverter` function that is given to to the
-    // `WriteAhead.write(entries, coverter)` function. The function takes a user
-    // defined set of entries and converts it...
-
-    // Hmm... We don't need to do this converstion with a callback. The
-    // converter function is only ever used with write.
-
-    //
-    function writable (entry) {
-        const pages = new Set
-        for (const node of entry.nodes) {
-            pages.add(node.page)
-        }
-        return {
-            keys: [...pages],
-            body: recorder([ entry.nodes.map(node => Buffer.from(JSON.stringify(node))) ])
-        }
-    }
-    //
-
     // Here we write out a set of records, then read them back immediately.
 
     //
@@ -130,7 +76,16 @@ require('proof')(8, async okay => {
         // time. You can have multiple concurrent readers, however.
 
         //
-        await writeahead.write(writes, writable)
+        await writeahead.write([{
+            keys: [ 0, 1 ],
+            body: Buffer.from('a')
+        }, {
+            keys: [ 0 ],
+            body: Buffer.from('b')
+        }, {
+            keys: [ 1 ],
+            body: Buffer.from('c')
+        }])
         //
 
         // To read we create an asynchronous iterator that returns blocks.
@@ -158,47 +113,23 @@ require('proof')(8, async okay => {
         // implementation issues instead of me.
 
         //
-        const player = new Player(() => 0), gathered = []
-        for await (const block of writeahead.read(0)) {
-            for (const entry of player.split(block)) {
-                for (const node of entry.parts.map(part => JSON.parse(String(part)))) {
-                    gathered.push(node)
-                }
-            }
+        const gathered = []
+        for await (const block of writeahead.read(1)) {
+            gathered.push(block.toString())
         }
 
-        okay(gathered, [{
-            page: 0, node: 1
-        }, {
-            page: 0, node: 2
-        }, {
-            page: 1, node: 3
-        }, {
-            page: 0, node: 3
-        }], 'write')
+        okay(gathered, [ 'a', 'c' ], 'write')
     }
 
     {
         const writeahead = await WriteAhead.open({ directory })
 
-        const player = new Player(() => 0), gathered = []
-        for await (const block of writeahead.read(0)) {
-            for (const entry of player.split(block)) {
-                for (const node of entry.parts.map(part => JSON.parse(String(part)))) {
-                    gathered.push(node)
-                }
-            }
+        const gathered = []
+        for await (const block of writeahead.read(1)) {
+            gathered.push(block.toString())
         }
 
-        okay(gathered, [{
-            page: 0, node: 1
-        }, {
-            page: 0, node: 2
-        }, {
-            page: 1, node: 3
-        }, {
-            page: 0, node: 3
-        }], 'reopened')
+        okay(gathered, [ 'a', 'c' ], 'reopened')
     }
 
     {
@@ -207,144 +138,59 @@ require('proof')(8, async okay => {
         await writeahead.rotate()
 
         await writeahead.write([{
-            version: 3,
-            nodes: [{
-                page: 2, node: 0
-            }, {
-                page: 0, node: 4
-            }]
-        }].concat(writes), writable)
+            keys: [ 0 ],
+            body: Buffer.from('d')
+        }, {
+            keys: [ 0, 1 ],
+            body: Buffer.from('e')
+        }])
 
-        const player = new Player(() => 0), gathered = []
-        for await (const block of writeahead.read(0)) {
-            for (const entry of player.split(block)) {
-                for (const node of entry.parts.map(part => JSON.parse(String(part)))) {
-                    gathered.push(node)
-                }
-            }
+        const gathered = []
+        for await (const block of writeahead.read(1)) {
+            gathered.push(block.toString())
         }
 
-        okay(gathered, [{
-            page: 0, node: 1
-        }, {
-            page: 0, node: 2
-        }, {
-            page: 1, node: 3
-        }, {
-            page: 0, node: 3
-        }, {
-            page: 2, node: 0
-        }, {
-            page: 0, node: 4
-        }, {
-            page: 0, node: 1
-        }, {
-            page: 0, node: 2
-        }, {
-            page: 1, node: 3
-        }, {
-            page: 0, node: 3
-        }], 'rotated')
+        okay(gathered, [ 'a', 'c', 'e' ], 'rotated')
     }
 
     {
         const writeahead = await WriteAhead.open({ directory })
 
-        const player = new Player(() => 0), gathered = []
-        for await (const block of writeahead.read(0)) {
-            for (const entry of player.split(block)) {
-                for (const node of entry.parts.map(part => JSON.parse(String(part)))) {
-                    gathered.push(node)
-                }
+        const gathered = []
+        for await (const block of writeahead.read(1)) {
+            gathered.push(block.toString())
+        }
+
+        okay(gathered, [ 'a', 'c', 'e' ], 'rotated reopened')
+
+        await writeahead.shift()
+
+        {
+            gathered.length = 0
+            for await (const block of writeahead.read(1)) {
+                gathered.push(block.toString())
             }
         }
 
-        okay(gathered, [{
-            page: 0, node: 1
-        }, {
-            page: 0, node: 2
-        }, {
-            page: 1, node: 3
-        }, {
-            page: 0, node: 3
-        }, {
-            page: 2, node: 0
-        }, {
-            page: 0, node: 4
-        }, {
-            page: 0, node: 1
-        }, {
-            page: 0, node: 2
-        }, {
-            page: 1, node: 3
-        }, {
-            page: 0, node: 3
-        }], 'rotated reopened')
+        okay(gathered, [ 'e' ], 'shifted')
+    }
+
+    {
+        const writeahead = await WriteAhead.open({ directory })
+
+        const gathered = []
+        for await (const block of writeahead.read(1)) {
+            gathered.push(block.toString())
+        }
+
+        okay(gathered, [ 'e' ], 'shifted reopened')
 
         await writeahead.shift()
 
         {
             gathered.length = 0
             for await (const block of writeahead.read(0)) {
-                for (const entry of player.split(block)) {
-                    for (const node of entry.parts.map(part => JSON.parse(String(part)))) {
-                        gathered.push(node)
-                    }
-                }
-            }
-        }
-
-        okay(gathered, [{
-            page: 2, node: 0
-        }, {
-            page: 0, node: 4
-        }, {
-            page: 0, node: 1
-        }, {
-            page: 0, node: 2
-        }, {
-            page: 1, node: 3
-        }, {
-            page: 0, node: 3
-        }], 'shifted')
-    }
-
-    {
-        const writeahead = await WriteAhead.open({ directory })
-
-        const player = new Player(() => 0), gathered = []
-        for await (const block of writeahead.read(0)) {
-            for (const entry of player.split(block)) {
-                for (const node of entry.parts.map(part => JSON.parse(String(part)))) {
-                    gathered.push(node)
-                }
-            }
-        }
-
-        okay(gathered, [{
-            page: 2, node: 0
-        }, {
-            page: 0, node: 4
-        }, {
-            page: 0, node: 1
-        }, {
-            page: 0, node: 2
-        }, {
-            page: 1, node: 3
-        }, {
-            page: 0, node: 3
-        }], 'shifted reopened')
-
-        await writeahead.shift()
-
-        {
-            gathered.length = 0
-            for await (const block of writeahead.read(0)) {
-                for (const entry of player.split(block)) {
-                    for (const node of entry.parts.map(part => JSON.parse(String(part)))) {
-                        gathered.push(node)
-                    }
-                }
+                gathered.push(block.toString())
             }
         }
 
@@ -356,31 +202,25 @@ require('proof')(8, async okay => {
     {
         const writeahead = await WriteAhead.open({ directory })
 
-        function writable (entry) {
-            const pages = new Set
-            for (const node of entry.nodes) {
-                pages.add(node.page)
-            }
-            return {
-                keys: [...pages],
-                body: recorder([ entry.nodes.map(node => Buffer.from(JSON.stringify(node))) ])
-            }
-        }
-
-        await writeahead.write(writes, writable)
+        await writeahead.write([{
+            keys: [ 0, 1 ],
+            body: Buffer.from('a')
+        }, {
+            keys: [ 0 ],
+            body: Buffer.from('b')
+        }, {
+            keys: [ 1 ],
+            body: Buffer.from('c')
+        }])
 
         await fs.unlink(path.join(__dirname, 'tmp', 'writeahead', '0'))
 
         const errors = []
 
         try {
-            const player = new Player(() => 0), gathered = []
-            for await (const block of writeahead.read(0, null, $ => $())) {
-                for (const entry of player.split(block)) {
-                    for (const node of entry.parts.map(part => JSON.parse(String(part)))) {
-                        gathered.push(node)
-                    }
-                }
+            const gathered = []
+            for await (const block of writeahead.read(0)) {
+                gathered.push(block.toString())
             }
         } catch (error) {
             console.log(error.stack)
