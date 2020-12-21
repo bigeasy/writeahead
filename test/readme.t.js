@@ -114,7 +114,7 @@ require('proof')(10, async okay => {
 
         //
         const gathered = []
-        for await (const block of writeahead.read(1)) {
+        for await (const block of writeahead.get(1)) {
             gathered.push(block.toString())
         }
 
@@ -125,7 +125,7 @@ require('proof')(10, async okay => {
         const writeahead = await WriteAhead.open({ directory })
 
         const gathered = []
-        for await (const block of writeahead.read(1)) {
+        for await (const block of writeahead.get(1)) {
             gathered.push(block.toString())
         }
 
@@ -166,7 +166,7 @@ require('proof')(10, async okay => {
         }], 'head')
 
         gathered.length = 0
-        for await (const block of writeahead.read(1)) {
+        for await (const block of writeahead.get(1)) {
             gathered.push(block.toString())
         }
 
@@ -177,7 +177,7 @@ require('proof')(10, async okay => {
         const writeahead = await WriteAhead.open({ directory })
 
         const gathered = []
-        for await (const block of writeahead.read(1)) {
+        for await (const block of writeahead.get(1)) {
             gathered.push(block.toString())
         }
 
@@ -187,7 +187,7 @@ require('proof')(10, async okay => {
 
         {
             gathered.length = 0
-            for await (const block of writeahead.read(1)) {
+            for await (const block of writeahead.get(1)) {
                 gathered.push(block.toString())
             }
         }
@@ -199,7 +199,7 @@ require('proof')(10, async okay => {
         const writeahead = await WriteAhead.open({ directory })
 
         const gathered = []
-        for await (const block of writeahead.read(1)) {
+        for await (const block of writeahead.get(1)) {
             gathered.push(block.toString())
         }
 
@@ -209,7 +209,7 @@ require('proof')(10, async okay => {
 
         {
             gathered.length = 0
-            for await (const block of writeahead.read(0)) {
+            for await (const block of writeahead.get(0)) {
                 gathered.push(block.toString())
             }
         }
@@ -239,7 +239,7 @@ require('proof')(10, async okay => {
 
         try {
             const gathered = []
-            for await (const block of writeahead.read(0)) {
+            for await (const block of writeahead.get(0)) {
                 gathered.push(block.toString())
             }
         } catch (error) {

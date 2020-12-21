@@ -90,7 +90,7 @@ class WriteAhead {
     // Returns an asynchronous iterator over the blocks for the given key.
 
     //
-    async *read (key) {
+    async *get (key) {
         const keyified = Keyify.stringify(key)
         const player = new Player(this._checksum)
         const shared = this._logs.slice()
