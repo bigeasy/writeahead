@@ -3,7 +3,7 @@
 // assumptions. Perhaps someday they will be convictions.
 
 //
-require('proof')(8, async okay => {
+require('proof')(10, async okay => {
     const WriteAhead = require('..')
     //
 
@@ -135,6 +135,13 @@ require('proof')(8, async okay => {
     {
         const writeahead = await WriteAhead.open({ directory })
 
+        const gathered = []
+        for await (const { keys, body } of writeahead.head()) {
+            gathered.push({ keys, body: body.toString() })
+        }
+
+        okay(gathered, [], 'nothing gathered because there is only one page')
+
         await writeahead.rotate()
 
         await writeahead.write([{
@@ -145,7 +152,20 @@ require('proof')(8, async okay => {
             body: Buffer.from('e')
         }])
 
-        const gathered = []
+        gathered.length = 0
+        for await (const { keys, body } of writeahead.head()) {
+            gathered.push({ keys, body: body.toString() })
+        }
+
+        okay(gathered, [{
+            keys: [ 0, 1 ], body: 'a'
+        }, {
+            keys: [ 0 ], body: 'b'
+        }, {
+            keys: [ 1 ], body: 'c'
+        }], 'head')
+
+        gathered.length = 0
         for await (const block of writeahead.read(1)) {
             gathered.push(block.toString())
         }

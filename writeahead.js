@@ -8,6 +8,7 @@ const Interrupt = require('interrupt')
 const assert = require('assert')
 const coalesce = require('extant')
 const Sequester = require('sequester')
+const Staccato = { Readable: require('staccato/readable') }
 
 let latch
 
@@ -57,7 +58,8 @@ class WriteAhead {
         const blocks = {}
         for (const id of ids) {
             blocks[id] = {}
-            const readable = fileSystem.createReadStream(path.join(directory, String(id)))
+            const stream = fileSystem.createReadStream(path.join(directory, String(id)))
+            const readable = new Staccato.Readable(stream)
             let position = 0, remainder = 0
             for await (const block of readable) {
                 let offset = 0
@@ -122,6 +124,30 @@ class WriteAhead {
             } while (index != logs.length)
         } finally {
             shared.map(log => log.sequester.unlock())
+        }
+    }
+
+    async *head () {
+        if (this._logs.length > 1) {
+            const log = this._logs[0]
+            await log.sequester.share()
+            try {
+                if (!log.shifted) {
+                    const player = new Player(this._checksum)
+                    const filename = path.join(this.directory, String(log.id))
+                    const stream = fileSystem.createReadStream(filename)
+                    const readable = new Staccato.Readable(stream)
+                    for await (const buffer of readable) {
+                        const entries = player.split(buffer)
+                        for (const entry of entries) {
+                            const keys = JSON.parse(String(entry.parts[0]))
+                            yield { keys, body: entry.parts[1] }
+                        }
+                    }
+                }
+            } finally {
+                log.sequester.unlock()
+            }
         }
     }
 
