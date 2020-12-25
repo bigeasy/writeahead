@@ -22,7 +22,7 @@
     },
     "dependencies":
     {
-                            "interrupt":                    "11.0.0-alpha.11",
+                            "interrupt":                    "11.0.0-alpha.13",
                             "keyify":                       "2.0.5",
                             "sequester":                    "2.0.0-alpha.0",
                             "staccato":                     "^12.0.3",
