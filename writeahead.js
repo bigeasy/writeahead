@@ -14,7 +14,8 @@ let latch
 
 class WriteAhead {
     static Error = Interrupt.create('WriteAhead.Error', {
-        'IO_ERROR': {},
+        'IO_ERROR': 'i/o error',
+        'NO_LOGS': 'attempt to write when no logs exist',
         'OPEN_ERROR': {
             code: 'IO_ERROR',
             message: 'unable to open file'
@@ -33,20 +34,14 @@ class WriteAhead {
         }
     })
 
-    constructor ({ directory, logs, checksum, blocks }) {
+    constructor ({ directory, logs, checksum, blocks, handle, position }) {
         this.directory = directory
         this._logs = logs
         this._recorder = Recorder.create(checksum)
         this._blocks = blocks
         this._checksum = checksum
-        if (this._logs.length == 0) {
-            this._blocks[0] = []
-            this._logs.push({
-                id: 0,
-                shifted: false,
-                sequester: new Sequester
-            })
-        }
+        this._handle = handle
+        this._position = position
     }
 
     static async open ({ directory, checksum = () => 0 }) {
@@ -58,8 +53,9 @@ class WriteAhead {
         const blocks = {}
         for (const id of ids) {
             blocks[id] = {}
-            const stream = fileSystem.createReadStream(path.join(directory, String(id)))
-            const staccato = new Staccato(stream)
+            const filename = path.join(directory, String(id))
+            const stream = fileSystem.createReadStream(filename)
+            const staccato = new Staccato($ => $(), stream, { filename })
             let position = 0, remainder = 0
             try {
                 for await (const block of staccato) {
@@ -87,7 +83,25 @@ class WriteAhead {
             }
         }
         const logs = ids.map(id => ({ id, shifted: false, sequester: new Sequester }))
-        return new WriteAhead({ directory, logs, checksum, blocks })
+        // Order here is so that handle open comes last so I don't have to add a
+        // catch block with a close.
+        if (logs.length == 0) {
+            blocks[0] = []
+            const log = {
+                id: 0,
+                shifted: false,
+                sequester: new Sequester
+            }
+            logs.push(log)
+            const filename = path.join(directory, String(log.id))
+            await WriteAhead.Error.resolve(fs.writeFile(filename, '', { flags: 'wx' }), 'IO_ERROR', { filename })
+        }
+        const log = logs[logs.length - 1]
+        const filename = path.join(directory, String(log.id))
+        const stat = await WriteAhead.Error.resolve(fs.stat(filename), 'IO_ERROR', { filename })
+        const position = stat.size
+        const handle = await WriteAhead.Error.resolve(fs.open(filename, 'a'), 'IO_ERROR', { filename })
+        return new WriteAhead({ directory, logs, checksum, blocks, handle, position })
     }
     //
 
@@ -170,44 +184,53 @@ class WriteAhead {
 
     //
     async write (entries) {
+        WriteAhead.Error.assert(this._handle != null, 'NO_LOGS')
         const { _recorder: recorder } = this
         const log = this._logs[this._logs.length - 1]
+        const buffers = [], positions = {}
+        for (const entry of entries) {
+            const { keys, body } = entry
+            const keyified = keys.map(key => Keyify.stringify(key))
+            const block = recorder([[ Buffer.from(JSON.stringify(keys)) ], [ body ]])
+            for (const key of keyified) {
+                positions[key] || (positions[key] = [])
+                positions[key].push({ position: this._position, length: block.length })
+            }
+            this._position += block.length
+            buffers.push(block)
+        }
         const filename = path.join(this.directory, String(log.id))
-        const handle = await fs.open(filename, 'a')
-        try {
-            const stat = await handle.stat()
-            let position = stat.size
-            const buffers = [], positions = {}
-            for (const entry of entries) {
-                const { keys, body } = entry
-                const keyified = keys.map(key => Keyify.stringify(key))
-                const block = recorder([[ Buffer.from(JSON.stringify(keys)) ], [ body ]])
-                for (const key of keyified) {
-                    positions[key] || (positions[key] = [])
-                    positions[key].push({ position, length: block.length })
-                }
-                position += block.length
-                buffers.push(block)
-            }
-            await handle.appendFile(Buffer.concat(buffers))
-            await handle.sync()
-            for (const key in positions) {
-                this._blocks[log.id][key] || (this._blocks[log.id][key] = [])
-                this._blocks[log.id][key].push.apply(this._blocks[log.id][key], positions[key])
-            }
-        } finally {
-            await handle.close()
+        await WriteAhead.Error.resolve(this._handle.appendFile(Buffer.concat(buffers)), 'IO_ERROR', { filename })
+        for (const key in positions) {
+            this._blocks[log.id][key] || (this._blocks[log.id][key] = [])
+            this._blocks[log.id][key].push.apply(this._blocks[log.id][key], positions[key])
+        }
+    }
+
+    async sync () {
+        if (this._handle != null) {
+            const log = this._logs[this._logs.length - 1]
+            const filename = path.join(this.directory, String(log.id))
+            await WriteAhead.Error.resolve(this._handle.sync(), 'IO_ERROR', { filename })
         }
     }
 
     async rotate () {
+        if (this._handle != null) {
+            const log = this._logs[this._logs.length - 1]
+            const filename = path.join(this.directory, String(log.id))
+            const handle = this._handle
+            this._handle = null
+            await WriteAhead.Error.resolve(handle.close(), 'IO_ERROR', { filename })
+        }
         const log = {
-            id: this._logs[this._logs.length - 1].id + 1,
+            id: this._logs.length == 0 ? 0 : this._logs[this._logs.length - 1].id + 1,
             shifted: false,
             sequester: new Sequester
         }
         const filename = path.join(this.directory, String(log.id))
-        await fs.writeFile(filename, '', { flags: 'wx' })
+        this._position = 0
+        this._handle = await WriteAhead.Error.resolve(fs.open(filename, 'ax'), 'IO_ERROR', { filename })
         this._logs.push(log)
         this._blocks[log.id] = []
     }
@@ -218,11 +241,24 @@ class WriteAhead {
         }
         await this._logs[0].sequester.exclude()
         const log = this._logs.shift()
+        const filename = path.join(this.directory, String(log.id))
+        const handle = this._handle
+        this._handle = null
+        await WriteAhead.Error.resolve(handle.close(), 'IO_ERROR', { filename })
         log.shifted = true
         log.sequester.unlock()
-        const filename = path.join(this.directory, String(log.id))
-        await fs.unlink(filename)
+        await WriteAhead.Error.resolve(fs.unlink(filename), 'IO_ERROR', { filename })
         return true
+    }
+
+    async close () {
+        if (this._handle != null) {
+            const log = this._logs[this._logs.length - 1]
+            const filename = path.join(this.directory, String(log.id))
+            const handle = this._handle
+            this._handle = null
+            await WriteAhead.Error.resolve(handle.close(), 'IO_ERROR', { filename })
+        }
     }
 }
 

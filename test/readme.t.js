@@ -88,6 +88,14 @@ require('proof')(10, async okay => {
         }])
         //
 
+        // A key feature of the write-ahead log is sync. At any point you can
+        // call `sync` and the writes will be flushed to the underlying storage
+        // medium.
+
+        //
+        await writeahead.sync()
+        //
+
         // To read we create an asynchronous iterator that returns blocks.
 
         // I decided to create a custom asynchronous iterator instead of
@@ -119,6 +127,8 @@ require('proof')(10, async okay => {
         }
 
         okay(gathered, [ 'a', 'c' ], 'write')
+
+        await writeahead.close()
     }
 
     {
@@ -130,6 +140,8 @@ require('proof')(10, async okay => {
         }
 
         okay(gathered, [ 'a', 'c' ], 'reopened')
+
+        await writeahead.close()
     }
 
     {
@@ -171,6 +183,9 @@ require('proof')(10, async okay => {
         }
 
         okay(gathered, [ 'a', 'c', 'e' ], 'rotated')
+
+        await writeahead.close()
+        await writeahead.close()
     }
 
     {
@@ -193,6 +208,8 @@ require('proof')(10, async okay => {
         }
 
         okay(gathered, [ 'e' ], 'shifted')
+
+        await writeahead.close()
     }
 
     {
@@ -217,6 +234,20 @@ require('proof')(10, async okay => {
         okay(gathered, [], 'shifted to empty')
 
         await writeahead.shift()
+
+        // Sync when there is no log.
+        await writeahead.sync()
+
+        try {
+            await writeahead.write([])
+        } catch (error) {
+            console.log(error.stack)
+        }
+
+        // Rotate when there is no log.
+        await writeahead.rotate()
+
+        await writeahead.close()
     }
 
     {
@@ -248,5 +279,7 @@ require('proof')(10, async okay => {
         }
 
         okay(errors, [ 'IO_ERROR' ], 'open error')
+
+        await writeahead.close()
     }
 })
