@@ -123,21 +123,24 @@ class WriteAhead {
             }
             do {
                 const log = this._logs[index++]
-                const blocks = this._blocks[log.id][keyified].slice()
-                const filename = path.join(this.directory, String(log.id))
-                const handle = await WriteAhead.Error.resolve(fs.open(filename, 'r'), 'OPEN_ERROR', { filename })
-                try {
-                    while (blocks.length != 0) {
-                        const block = blocks.shift()
-                        const buffer = Buffer.alloc(block.length)
-                        const { bytesRead } = await WriteAhead.Error.resolve(handle.read(buffer, 0, buffer.length, block.position), 'READ_ERROR', { filename })
-                        WriteAhead.Error.assert(bytesRead == buffer.length, 'BLOCK_SHORT_READ', { filename })
-                        const entries = player.split(buffer)
-                        WriteAhead.Error.assert(entries.length == 1, 'BLOCK_MISSING', { filename })
-                        yield entries[0].parts[1]
+                const got = this._blocks[log.id][keyified]
+                if (got != null) {
+                    const blocks = got.slice()
+                    const filename = path.join(this.directory, String(log.id))
+                    const handle = await WriteAhead.Error.resolve(fs.open(filename, 'r'), 'OPEN_ERROR', { filename })
+                    try {
+                        while (blocks.length != 0) {
+                            const block = blocks.shift()
+                            const buffer = Buffer.alloc(block.length)
+                            const { bytesRead } = await WriteAhead.Error.resolve(handle.read(buffer, 0, buffer.length, block.position), 'READ_ERROR', { filename })
+                            WriteAhead.Error.assert(bytesRead == buffer.length, 'BLOCK_SHORT_READ', { filename })
+                            const entries = player.split(buffer)
+                            WriteAhead.Error.assert(entries.length == 1, 'BLOCK_MISSING', { filename })
+                            yield entries[0].parts[1]
+                        }
+                    } finally {
+                        await WriteAhead.Error.resolve(handle.close(), 'CLOSE_ERROR', { filename })
                     }
-                } finally {
-                    await WriteAhead.Error.resolve(handle.close(), 'CLOSE_ERROR', { filename })
                 }
             } while (index != logs.length)
         } finally {
