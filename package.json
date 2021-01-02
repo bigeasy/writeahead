@@ -23,7 +23,7 @@
     "dependencies":
     {
                             "interrupt":                    "11.0.0-alpha.14",
-                            "keyify":                       "2.0.5",
+                            "keyify":                       "^2.0.5",
                             "sequester":                    "2.0.0-alpha.0",
                             "transcript":                   "0.1.3"
     },
