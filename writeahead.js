@@ -8,7 +8,8 @@ const Interrupt = require('interrupt')
 const assert = require('assert')
 const coalesce = require('extant')
 const Sequester = require('sequester')
-const Staccato = require('staccato/redux')
+
+const io = require('./io')
 
 let latch
 
@@ -55,31 +56,27 @@ class WriteAhead {
             blocks[id] = {}
             const filename = path.join(directory, String(id))
             const stream = fileSystem.createReadStream(filename)
-            const staccato = new Staccato($ => $(), stream, { filename })
+            const buffer = Buffer.alloc(1024 * 1024)
             let position = 0, remainder = 0
-            try {
-                for await (const block of staccato) {
-                    let offset = 0
-                    for (;;) {
-                        const [ entry ] = player.split(block.slice(offset), 1)
-                        if (entry == null) {
-                            break
-                        }
-                        const keys = JSON.parse(String(entry.parts[0]))
-                                         .map(key => Keyify.stringify(key))
-                        const length = entry.sizes.reduce((sum, value) => sum + value, 0)
-                        for (const key of keys) {
-                            blocks[id][key] || (blocks[id][key] = [])
-                            blocks[id][key].push({ position, length })
-                        }
-                        position += length
-                        offset += length - remainder
-                        remainder = 0
+            for await (const block of io.read(WriteAhead.Error.resolve('IO_ERROR', { filename }), filename)) {
+                let offset = 0
+                for (;;) {
+                    const [ entry ] = player.split(block.slice(offset), 1)
+                    if (entry == null) {
+                        break
                     }
-                    remainder = block.length - offset
+                    const keys = JSON.parse(String(entry.parts[0]))
+                                     .map(key => Keyify.stringify(key))
+                    const length = entry.sizes.reduce((sum, value) => sum + value, 0)
+                    for (const key of keys) {
+                        blocks[id][key] || (blocks[id][key] = [])
+                        blocks[id][key].push({ position, length })
+                    }
+                    position += length
+                    offset += length - remainder
+                    remainder = 0
                 }
-            } finally {
-                staccato.close()
+                remainder = block.length - offset
             }
         }
         const logs = ids.map(id => ({ id, shifted: false, sequester: new Sequester }))
@@ -157,17 +154,12 @@ class WriteAhead {
                     const player = new Player(this._checksum)
                     const filename = path.join(this.directory, String(log.id))
                     const stream = fileSystem.createReadStream(filename)
-                    const staccato = new Staccato(stream)
-                    try {
-                        for await (const buffer of staccato) {
-                            const entries = player.split(buffer)
-                            for (const entry of entries) {
-                                const keys = JSON.parse(String(entry.parts[0]))
-                                yield { keys, body: entry.parts[1] }
-                            }
+                    for await (const block of io.read(WriteAhead.Error.resolve('IO_ERROR', { filename }), filename)) {
+                        const entries = player.split(block)
+                        for (const entry of entries) {
+                            const keys = JSON.parse(String(entry.parts[0]))
+                            yield { keys, body: entry.parts[1] }
                         }
-                    } finally {
-                        staccato.close()
                     }
                 }
             } finally {
