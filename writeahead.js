@@ -39,7 +39,7 @@ class WriteAhead {
 
     constructor (destructible, turnstile, { directory, logs, checksum, blocks, open, position, sync }) {
         this.destructible = destructible
-        this.deferrable = destructible.durable($ => $(), 'deferrable', 1)
+        this.deferrable = destructible.durable($ => $(), 'deferrable', { countdown: 1 })
         this._fracture = new Fracture(this.destructible.durable($ => $(), 'appender'), turnstile, name => {
             switch (name) {
             case 'write':
@@ -52,8 +52,9 @@ class WriteAhead {
         this._fracture.deferrable.increment()
         this.destructible.destruct(() => this.deferrable.decrement())
         this.deferrable.destruct(() => {
-            this._fracture.deferrable.decrement()
             this.deferrable.ephemeral($ => $(), 'shutdown', async () => {
+                this._fracture.drain()
+                this._fracture.deferrable.decrement()
                 if (this._open != null) {
                     const open = this._open
                     this._open = null
@@ -179,6 +180,7 @@ class WriteAhead {
 
     //
     write (entries) {
+        Destructible.Error.assert(! this.deferrable.destroyed, 'DESTROYED')
         const log = this._logs[this._logs.length - 1], blocks = []
         for (const entry of entries) {
             const { keys, buffer } = entry

@@ -22,7 +22,7 @@
     },
     "dependencies":
     {
-                            "fracture":                     "0.3.0-alpha.28",
+                            "fracture":                     "0.3.0-alpha.29",
                             "interrupt":                    "11.0.0-alpha.16",
                             "keyify":                       "^2.0.5",
                             "operation":                    "6.0.0-alpha.2",
@@ -33,7 +33,8 @@
     "devDependencies":
     {
                             "destructible":                 "7.0.0-alpha.32",
-                            "proof":                        "^9.0.2"
+                            "proof":                        "^9.0.2",
+                            "turnstile":                    "6.0.0-alpha.46"
     },
     "main":                 "writeahead",
     "scripts":
