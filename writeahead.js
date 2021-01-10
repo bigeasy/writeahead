@@ -15,6 +15,7 @@ const Keyify = require('keyify')
 const Fracture = require('fracture')
 const Future = require('perhaps')
 const Sequester = require('sequester')
+const Turnstile = require('turnstile')
 
 class WriteAhead {
     static Error = Interrupt.create('WriteAhead.Error', {
@@ -37,11 +38,20 @@ class WriteAhead {
             message: 'block contained an invalid checksum'
         }
     })
+    //
 
-    constructor (destructible, turnstile, { directory, logs, checksum, blocks, open, position, sync }) {
+    // Unlike other modules, WriteAhead manages its own Turnstile. It only ever
+    // needs one background strand so we can just give it a single strand
+    // Turnstile and not have to worry about the deadlock issues of a shared
+    // Turnstile.
+
+    //
+    constructor (destructible, { directory, logs, checksum, blocks, open, position, sync }) {
         this.destructible = destructible
         this.deferrable = destructible.durable($ => $(), 'deferrable', { countdown: 1 })
-        this._fracture = new Fracture(this.destructible.durable($ => $(), 'appender'), turnstile, name => {
+        // Create a Fracture using a private Turnstile.
+        this.turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
+        this._fracture = new Fracture(this.destructible.durable($ => $(), 'appender'), this.turnstile, name => {
             switch (name) {
             case 'write':
                 return { blocks: [], done: new Future }
@@ -54,7 +64,7 @@ class WriteAhead {
         this.destructible.destruct(() => this.deferrable.decrement())
         this.deferrable.destruct(() => {
             this.deferrable.ephemeral($ => $(), 'shutdown', async () => {
-                this._fracture.drain()
+                this.destructible.copacetic('drain', null, async () => this._fracture.drain())
                 this._fracture.deferrable.decrement()
                 if (this._open != null) {
                     const open = this._open
