@@ -51,15 +51,19 @@ class WriteAhead {
         this.deferrable = destructible.durable($ => $(), 'deferrable', { countdown: 1 })
         // Create a Fracture using a private Turnstile.
         this.turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
-        this._fracture = new Fracture(this.destructible.durable($ => $(), 'appender'), this.turnstile, name => {
-            switch (name) {
-            case 'write':
-                return { blocks: [], done: new Future }
-            case 'rotate':
-            case 'shift':
-                return { done: new Future }
-            }
-        }, this._background.bind(this))
+        this._fracture = new Fracture(this.destructible.durable($ => $(), 'appender'), {
+            turnstile: this.turnstile,
+            entry: name => {
+                switch (name) {
+                case 'write':
+                    return { blocks: [], done: new Future }
+                case 'rotate':
+                case 'shift':
+                    return { done: new Future }
+                }
+            },
+            worker: this._background.bind(this)
+        })
         this._fracture.deferrable.increment()
         this.destructible.destruct(() => this.deferrable.decrement())
         this.deferrable.destruct(() => {
