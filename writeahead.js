@@ -59,7 +59,7 @@ class WriteAhead {
             case 'shift':
                 return { done: new Future }
             }
-        }, this._background, this)
+        }, this._background.bind(this))
         this._fracture.deferrable.increment()
         this.destructible.destruct(() => this.deferrable.decrement())
         this.deferrable.destruct(() => {
