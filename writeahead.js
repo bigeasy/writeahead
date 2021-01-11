@@ -48,7 +48,7 @@ class WriteAhead {
     //
     constructor (destructible, { directory, logs, checksum, blocks, open, position, sync }) {
         this.destructible = destructible
-        this.deferrable = destructible.durable($ => $(), 'deferrable', { countdown: 1 })
+        this.deferrable = destructible.durable($ => $(), { countdown: 1 }, 'deferrable')
         // Create a Fracture using a private Turnstile.
         this.turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         this._fracture = new Fracture(this.destructible.durable($ => $(), 'appender'), {
