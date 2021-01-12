@@ -195,7 +195,7 @@ class WriteAhead {
 
     //
     write (entries) {
-        Destructible.Error.assert(! this.deferrable.destroyed, 'DESTROYED')
+        this.deferrable.operational()
         const log = this._logs[this._logs.length - 1], blocks = []
         for (const entry of entries) {
             const { keys, buffer } = entry
