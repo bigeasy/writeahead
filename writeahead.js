@@ -88,6 +88,10 @@ class WriteAhead {
         this.sync = sync
     }
 
+    get position () {
+        return this._position
+    }
+
     static async open ({ directory, checksum = () => 0, sync = new Operation.Sync }) {
         const dir = await fs.readdir(directory)
         const ids = dir.filter(file => /^\d+$/.test(file))
