@@ -68,7 +68,7 @@ class WriteAhead {
         this.destructible.destruct(() => this.deferrable.decrement())
         this.deferrable.destruct(() => {
             this.deferrable.ephemeral($ => $(), 'shutdown', async () => {
-                this.destructible.copacetic('drain', null, async () => this._fracture.drain())
+                await this.destructible.copacetic('drain', null, async () => this._fracture.drain())
                 this._fracture.deferrable.decrement()
                 if (this._open != null) {
                     const open = this._open
@@ -170,9 +170,14 @@ class WriteAhead {
                             const buffer = Buffer.alloc(block.length)
                             const { bytesRead } = await WriteAhead.Error.resolve(handle.read(buffer, 0, buffer.length, block.position), 'READ_ERROR', { filename })
                             WriteAhead.Error.assert(bytesRead == buffer.length, 'BLOCK_SHORT_READ', { filename })
-                            const entries = player.split(buffer)
-                            WriteAhead.Error.assert(entries.length == 1, 'BLOCK_MISSING', { filename })
-                            yield entries[0].parts[1]
+                            try {
+                                const entries = player.split(buffer)
+                                WriteAhead.Error.assert(entries.length == 1, 'BLOCK_MISSING', { filename })
+                                yield entries[0].parts[1]
+                            } catch (error) {
+                                console.log(String(buffer))
+                                throw error
+                            }
                         }
                     }
                 } finally {
@@ -211,28 +216,40 @@ class WriteAhead {
         return entry.done
     }
 
+    writing = false
+
     async _write (blocks) {
-        this.deferrable.copacetic($ => $(), 'write', null, async () => {
-            WriteAhead.Error.assert(this._open != null, 'NO_LOGS')
-            const records = []
-            for (const { keys, block } of blocks) {
-                const record = (this._recorder)([[ Buffer.from(JSON.stringify(keys)) ], [ block.buffer ]])
-                records.push(record)
-                block.position = this._position
-                block.length = record.length
-                this._position += record.length
-            }
-            if (records.length != 0) {
-                await Operation.writev(this._open, records)
-            }
-            for (const { block } of blocks) {
-                block.buffer = null
-            }
-        })
+        if (this.writing) {
+            console.log(this.turnstile.health)
+            throw new Error
+        }
+        this.writing = true
+        if (this.deferrable.errored) {
+            throw new Error
+        }
+        WriteAhead.Error.assert(this._open != null, 'NO_LOGS')
+        const records = []
+        for (const { keys, block } of blocks) {
+            const record = (this._recorder)([[ Buffer.from(JSON.stringify(keys)) ], [ block.buffer ]])
+            records.push(record)
+            block.position = this._position
+            block.length = record.length
+            this._position += record.length
+        }
+        if (records.length != 0) {
+            await Operation.writev(this._open, records)
+        }
+        for (const { block } of blocks) {
+            block.buffer = null
+        }
+        this.writing = false
     }
 
     async _background ({ canceled, key, value }) {
-        this.deferrable.copacetic($ => $(), 'write', null, async () => {
+        if (canceled) {
+            console.log('yes rejecting')
+        }
+        await this.deferrable.copacetic($ => $(), 'write', null, async () => {
             try {
                 switch (key) {
                 case 'write': {
