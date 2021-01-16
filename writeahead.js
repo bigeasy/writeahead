@@ -56,10 +56,10 @@ class WriteAhead {
             entry: name => {
                 switch (name) {
                 case 'write':
-                    return { blocks: [], done: new Future }
+                    return { blocks: [] }
                 case 'rotate':
                 case 'shift':
-                    return { done: new Future }
+                    return {}
                 }
             },
             worker: this._background.bind(this)
@@ -174,14 +174,9 @@ class WriteAhead {
                             const buffer = Buffer.alloc(block.length)
                             const { bytesRead } = await WriteAhead.Error.resolve(handle.read(buffer, 0, buffer.length, block.position), 'READ_ERROR', { filename })
                             WriteAhead.Error.assert(bytesRead == buffer.length, 'BLOCK_SHORT_READ', { filename })
-                            try {
-                                const entries = player.split(buffer)
-                                WriteAhead.Error.assert(entries.length == 1, 'BLOCK_MISSING', { filename })
-                                yield entries[0].parts[1]
-                            } catch (error) {
-                                console.log(String(buffer))
-                                throw error
-                            }
+                            const entries = player.split(buffer)
+                            WriteAhead.Error.assert(entries.length == 1, 'BLOCK_MISSING', { filename })
+                            yield entries[0].parts[1]
                         }
                     }
                 } finally {
@@ -215,19 +210,12 @@ class WriteAhead {
             }
             blocks.push({ keys, block })
         }
-        const entry = this._fracture.enqueue('write')
-        entry.blocks.push.apply(entry.blocks, blocks)
-        return entry.done
+        const enqueue = this._fracture.enqueue('write')
+        enqueue.entry.blocks.push.apply(enqueue.entry.blocks, blocks)
+        return enqueue.completed
     }
 
-    writing = false
-
     async _write (blocks) {
-        if (this.writing) {
-            console.log(this.turnstile.health)
-            throw new Error
-        }
-        this.writing = true
         if (this.deferrable.errored) {
             throw new Error
         }
@@ -249,83 +237,76 @@ class WriteAhead {
         this.writing = false
     }
 
-    async _background ({ canceled, key, value }) {
-        if (canceled) {
-            console.log('yes rejecting')
-        }
+    async _background ({ canceled, key, entry, pause, completed }) {
         await this.deferrable.copacetic($ => $(), 'write', null, async () => {
-            try {
-                switch (key) {
-                case 'write': {
-                        await this._write(value.blocks)
-                        if (value.done.vivified) {
-                            await this.sync.sync(this._open)
-                        }
+            switch (key) {
+            case 'write': {
+                    await this._write(entry.blocks)
+                    if (completed.vivified) {
+                        await this.sync.sync(this._open)
                     }
-                    break
-                case 'rotate': {
-                        const pause = await this._fracture.pause('write')
-                        try {
-                            // Before we do anything asynchronous, we need to ensure that new
-                            // writes are queued where the new log is supposed to be.
-                            const log = {
-                                id: this._logs.length == 0 ? 0 : this._logs[this._logs.length - 1].id + 1,
-                                shifted: false,
-                                sequester: new Sequester
-                            }
-                            this._logs.push(log)
-                            this._blocks[log.id] = []
-                            const gathered = []
-                            for (const value of pause.entries) {
-                                gathered.push(value.blocks)
-                                value.blocks = []
-                            }
-                            for (const blocks of gathered) {
-                                await this._write(blocks)
-                            }
-                            this._position = 0
-                            if (this._logs.length != 1) {
-                                const open = this._open
-                                this._open = null
-                                await this.sync.sync(open)
-                                await Operation.close(open)
-                            }
-                            this._open = await Operation.open(path.join(this.directory, String(log.id)), this.sync.flag)
-                        } finally {
-                            pause.resume()
-                        }
-                    }
-                    break
-                case 'shift': {
-                        if (this._logs.length != 0) {
-                            await this._logs[0].sequester.exclude()
-                            const log = this._logs.shift()
-                            log.shifted = true
-                            log.sequester.unlock()
-                            if (this._logs.length == 0) {
-                                const open = this._open
-                                this._open = null
-                                await this.sync.sync(open)
-                                await Operation.close(open)
-                            }
-                            const filename = path.join(this.directory, String(log.id))
-                            await WriteAhead.Error.resolve(fs.unlink(filename), 'IO_ERROR', { filename })
-                        }
-                    }
-                    break
                 }
-            } finally {
-                value.done.resolve()
+                break
+            case 'rotate': {
+                    const write = await pause('write')
+                    try {
+                        // Before we do anything asynchronous, we need to ensure that new
+                        // writes are queued where the new log is supposed to be.
+                        const log = {
+                            id: this._logs.length == 0 ? 0 : this._logs[this._logs.length - 1].id + 1,
+                            shifted: false,
+                            sequester: new Sequester
+                        }
+                        this._logs.push(log)
+                        this._blocks[log.id] = {}
+                        const gathered = []
+                        for (const entry of write.entries) {
+                            gathered.push(entry.blocks)
+                            entry.blocks = []
+                        }
+                        for (const blocks of gathered) {
+                            await this._write(blocks)
+                        }
+                        this._position = 0
+                        if (this._logs.length != 1) {
+                            const open = this._open
+                            this._open = null
+                            await this.sync.sync(open)
+                            await Operation.close(open)
+                        }
+                        this._open = await Operation.open(path.join(this.directory, String(log.id)), this.sync.flag)
+                    } finally {
+                        write.resume()
+                    }
+                }
+                break
+            case 'shift': {
+                    if (this._logs.length != 0) {
+                        await this._logs[0].sequester.exclude()
+                        const log = this._logs.shift()
+                        log.shifted = true
+                        log.sequester.unlock()
+                        if (this._logs.length == 0) {
+                            const open = this._open
+                            this._open = null
+                            await this.sync.sync(open)
+                            await Operation.close(open)
+                        }
+                        const filename = path.join(this.directory, String(log.id))
+                        await WriteAhead.Error.resolve(fs.unlink(filename), 'IO_ERROR', { filename })
+                    }
+                }
+                break
             }
         })
     }
 
     rotate () {
-        return this._fracture.enqueue('rotate').done.promise
+        return this._fracture.enqueue('rotate').completed
     }
 
     shift () {
-        return this._fracture.enqueue('shift').done.promise
+        return this._fracture.enqueue('shift').completed
     }
 }
 

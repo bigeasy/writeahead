@@ -176,7 +176,7 @@ require('proof')(8, async okay => {
         const writeahead = new WriteAhead(destructible.durable('writeahead'), open)
 
         destructible.rescue($ => $(), 'writeahead', async () => {
-            await writeahead.rotate()
+            await writeahead.rotate().promise
 
             const future = writeahead.write([{
                 keys: [ 0 ],
