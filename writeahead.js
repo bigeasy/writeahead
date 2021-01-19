@@ -53,7 +53,7 @@ class WriteAhead {
         this.turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
         this._fracture = new Fracture(this.destructible.durable($ => $(), 'appender'), {
             turnstile: this.turnstile,
-            entry: name => {
+            work: name => {
                 switch (name) {
                 case 'write':
                     return { blocks: [] }
@@ -198,7 +198,7 @@ class WriteAhead {
     // out the relevant content from the body for a given key.
 
     //
-    write (entries) {
+    write (entries, sync = false) {
         this.deferrable.operational()
         const log = this._logs[this._logs.length - 1], blocks = []
         for (const entry of entries) {
@@ -211,7 +211,8 @@ class WriteAhead {
             blocks.push({ keys, block })
         }
         const enqueue = this._fracture.enqueue('write')
-        enqueue.entry.blocks.push.apply(enqueue.entry.blocks, blocks)
+        enqueue.work.blocks.push.apply(enqueue.work.blocks, blocks)
+        enqueue.work.sync = sync
         return enqueue.completed
     }
 
@@ -237,12 +238,12 @@ class WriteAhead {
         this.writing = false
     }
 
-    async _background ({ canceled, key, entry, pause, completed }) {
+    async _background ({ canceled, key, work, pause, completed }) {
         await this.deferrable.copacetic($ => $(), 'write', null, async () => {
             switch (key) {
             case 'write': {
-                    await this._write(entry.blocks)
-                    if (completed.vivified) {
+                    await this._write(work.blocks)
+                    if (work.sync) {
                         await this.sync.sync(this._open)
                     }
                 }

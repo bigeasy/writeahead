@@ -89,7 +89,7 @@ require('proof')(8, async okay => {
             }, {
                 keys: [ 1 ],
                 buffer: Buffer.from('c')
-            }])
+            }], true)
             //
 
             // You can get these written values immediately from memory before
@@ -102,11 +102,6 @@ require('proof')(8, async okay => {
             }
 
             okay(gathered, [ 'a', 'c' ], 'read from memory')
-            //
-
-            // If you wait on the future your wait will trigger a file sync. If
-            // you do not care about a sync then don't wait on the future.
-
             //
             await future.promise
             //
@@ -184,7 +179,7 @@ require('proof')(8, async okay => {
             }, {
                 keys: [ 0, 1 ],
                 buffer: Buffer.from('e')
-            }])
+            }], true)
 
             await future.promise
 
