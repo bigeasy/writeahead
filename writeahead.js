@@ -56,7 +56,7 @@ class WriteAhead {
             work: name => {
                 switch (name) {
                 case 'write':
-                    return { blocks: [] }
+                    return { blocks: [], sync: false }
                 case 'rotate':
                 case 'shift':
                     return {}
