@@ -6,6 +6,7 @@
 require('proof')(8, async okay => {
     const WriteAhead = require('..')
     const Destructible = require('destructible')
+    const Turnstile = require('turnstile')
     //
 
     // We use Transcript to create our example records. Transcript is used
@@ -66,7 +67,8 @@ require('proof')(8, async okay => {
         //
         const open = await WriteAhead.open({ directory })
         const destructible = new Destructible('writeahead.t')
-        const writeahead = new WriteAhead(destructible.durable('writeahead'), open)
+        const turnstile = new Turnstile(destructible.durable({ isolated: true }, 'turnstile'))
+        const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
         destructible.rescue($ => $(), 'writeahead', async () => {
             //
 
@@ -149,7 +151,8 @@ require('proof')(8, async okay => {
     {
         const open = await WriteAhead.open({ directory })
         const destructible = new Destructible('writeahead.t')
-        const writeahead = new WriteAhead(destructible.durable('writeahead'), open)
+        const turnstile = new Turnstile(destructible.durable({ isolated: true }, 'turnstile'))
+        const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
 
         destructible.rescue($ => $(), 'writeahead', async () => {
             const gathered = []
@@ -168,7 +171,8 @@ require('proof')(8, async okay => {
     {
         const open = await WriteAhead.open({ directory })
         const destructible = new Destructible('writeahead.t')
-        const writeahead = new WriteAhead(destructible.durable('writeahead'), open)
+        const turnstile = new Turnstile(destructible.durable({ isolated: true }, 'turnstile'))
+        const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
 
         destructible.rescue($ => $(), 'writeahead', async () => {
             await writeahead.rotate().promise
@@ -199,7 +203,8 @@ require('proof')(8, async okay => {
     {
         const open = await WriteAhead.open({ directory })
         const destructible = new Destructible('writeahead.t')
-        const writeahead = new WriteAhead(destructible.durable('writeahead'), open)
+        const turnstile = new Turnstile(destructible.durable({ isolated: true }, 'turnstile'))
+        const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
 
         destructible.rescue($ => $(), 'writeahead', async () => {
             const gathered = []
@@ -228,7 +233,8 @@ require('proof')(8, async okay => {
     {
         const open = await WriteAhead.open({ directory })
         const destructible = new Destructible('writeahead.t')
-        const writeahead = new WriteAhead(destructible.durable('writeahead'), open)
+        const turnstile = new Turnstile(destructible.durable({ isolated: true }, 'turnstile'))
+        const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
 
         destructible.rescue($ => $(), 'writeahead', async () => {
             const gathered = []

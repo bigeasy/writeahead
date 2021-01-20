@@ -15,7 +15,6 @@ const Keyify = require('keyify')
 const Fracture = require('fracture')
 const Future = require('perhaps')
 const Sequester = require('sequester')
-const Turnstile = require('turnstile')
 
 class WriteAhead {
     static Error = Interrupt.create('WriteAhead.Error', {
@@ -46,11 +45,12 @@ class WriteAhead {
     // Turnstile.
 
     //
-    constructor (destructible, { directory, logs, checksum, blocks, open, position, sync }) {
+    constructor (destructible, turnstile, { directory, logs, checksum, blocks, open, position, sync }) {
+        assert(destructible.isDestroyedIfDestroyed(turnstile.destructible))
         this.destructible = destructible
         this.deferrable = destructible.durable($ => $(), { countdown: 1 }, 'deferrable')
         // Create a Fracture using a private Turnstile.
-        this.turnstile = new Turnstile(destructible.durable($ => $(), 'turnstile'))
+        this.turnstile = turnstile
         this._fracture = new Fracture(this.destructible.durable($ => $(), 'appender'), {
             turnstile: this.turnstile,
             value: name => {
