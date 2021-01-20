@@ -213,7 +213,7 @@ class WriteAhead {
         const enqueue = this._fracture.enqueue('write')
         enqueue.value.blocks.push.apply(enqueue.value.blocks, blocks)
         enqueue.value.sync = sync
-        return enqueue.completed
+        return enqueue.future
     }
 
     async _write (blocks) {
@@ -238,7 +238,7 @@ class WriteAhead {
         this.writing = false
     }
 
-    async _background ({ canceled, key, value, pause, completed }) {
+    async _background ({ canceled, key, value, pause }) {
         await this.deferrable.copacetic($ => $(), 'write', null, async () => {
             switch (key) {
             case 'write': {
@@ -303,11 +303,11 @@ class WriteAhead {
     }
 
     rotate () {
-        return this._fracture.enqueue('rotate').completed
+        return this._fracture.enqueue('rotate').future
     }
 
     shift () {
-        return this._fracture.enqueue('shift').completed
+        return this._fracture.enqueue('shift').future
     }
 }
 
