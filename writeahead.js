@@ -4,8 +4,6 @@ const assert = require('assert')
 const path = require('path')
 const fs = require('fs').promises
 
-const coalesce = require('extant')
-
 const { Recorder, Player } = require('transcript')
 
 const Destructible = require('destructible')
