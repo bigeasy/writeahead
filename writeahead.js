@@ -44,7 +44,6 @@ class WriteAhead {
 
     //
     constructor (destructible, turnstile, { directory, logs, checksum, blocks, open, position, sync }) {
-        assert(destructible.isDestroyedIfDestroyed(turnstile.destructible))
         this.destructible = destructible
         this.deferrable = destructible.durable($ => $(), { countdown: 1 }, 'deferrable')
         // Create a Fracture using a private Turnstile.
