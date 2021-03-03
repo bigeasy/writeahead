@@ -34,7 +34,7 @@
     {
                             "destructible":                 "7.0.0-alpha.49",
                             "proof":                        "^9.0.2",
-                            "turnstile":                    "6.0.0-alpha.58"
+                            "turnstile":                    "6.0.0-alpha.60"
     },
     "main":                 "writeahead",
     "scripts":
