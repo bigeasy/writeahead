@@ -23,7 +23,7 @@
     "dependencies":
     {
                             "fracture":                     "0.3.0-alpha.52",
-                            "interrupt":                    "11.0.0-alpha.18",
+                            "interrupt":                    "11.0.0-alpha.20",
                             "keyify":                       "^2.0.5",
                             "operation":                    "6.0.0-alpha.6",
                             "perhaps":                      "0.0.6",
