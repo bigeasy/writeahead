@@ -8,7 +8,7 @@ const { Recorder, Player } = require('transcript')
 
 const Destructible = require('destructible')
 const Operation = require('operation')
-const { Interrupt } = require('interrupt')
+const Interrupt = require('interrupt')
 const Keyify = require('keyify')
 const Fracture = require('fracture')
 const Future = require('perhaps')
