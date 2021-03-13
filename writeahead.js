@@ -195,7 +195,7 @@ class WriteAhead {
     // out the relevant content from the body for a given key.
 
     //
-    write (entries, sync = false) {
+    write (stack, entries, sync = false) {
         this.deferrable.operational()
         const log = this._logs[this._logs.length - 1], blocks = []
         for (const entry of entries) {
@@ -207,10 +207,10 @@ class WriteAhead {
             }
             blocks.push({ keys, block })
         }
-        const enqueue = this._fracture.enqueue('write')
-        enqueue.value.blocks.push.apply(enqueue.value.blocks, blocks)
-        enqueue.value.sync = sync
-        return enqueue.future
+        return this._fracture.enqueue(stack, 'write', value => {
+            value.blocks.push.apply(value.blocks, blocks)
+            value.sync = sync
+        })
     }
 
     async _write (blocks) {
@@ -258,8 +258,8 @@ class WriteAhead {
                         this._logs.push(log)
                         this._blocks[log.id] = {}
                         const gathered = []
-                        for (const entry of write.entries) {
-                            gathered.push(entry.blocks)
+                        for (const value of write.values) {
+                            gathered.push(value.blocks)
                             entry.blocks = []
                         }
                         for (const blocks of gathered) {
@@ -299,12 +299,12 @@ class WriteAhead {
         })
     }
 
-    rotate () {
-        return this._fracture.enqueue('rotate').future
+    rotate (stack) {
+        return this._fracture.enqueue(stack, 'rotate')
     }
 
-    shift () {
-        return this._fracture.enqueue('shift').future
+    shift (stack) {
+        return this._fracture.enqueue(stack, 'shift')
     }
 }
 

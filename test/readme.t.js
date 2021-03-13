@@ -24,6 +24,11 @@ require('proof')(8, async okay => {
     const recorder = Recorder.create(() => 0)
     //
 
+    // TK DOCUMENT THIS
+
+    //
+    const Fracture = require('fracture')
+
     // We include the basics of the Node.js API.
 
     //
@@ -82,7 +87,7 @@ require('proof')(8, async okay => {
             // a time. You can have multiple concurrent readers, however.
 
             //
-            const future = writeahead.write([{
+            const promise = writeahead.write(Fracture.stack(), [{
                 keys: [ 0, 1 ],
                 buffer: Buffer.from('a')
             }, {
@@ -105,7 +110,7 @@ require('proof')(8, async okay => {
 
             okay(gathered, [ 'a', 'c' ], 'read from memory')
             //
-            await future.promise
+            await promise
             //
 
             // To read we create an asynchronous iterator that returns blocks.
@@ -175,17 +180,15 @@ require('proof')(8, async okay => {
         const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
 
         destructible.rescue($ => $(), 'writeahead', async () => {
-            await writeahead.rotate().promise
+            await writeahead.rotate(Fracture.stack())
 
-            const future = writeahead.write([{
+            await writeahead.write(Fracture.stack(), [{
                 keys: [ 0 ],
                 buffer: Buffer.from('d')
             }, {
                 keys: [ 0, 1 ],
                 buffer: Buffer.from('e')
             }], true)
-
-            await future.promise
 
             const gathered = []
             for await (const block of writeahead.get(1)) {
@@ -214,7 +217,7 @@ require('proof')(8, async okay => {
 
             okay(gathered, [ 'a', 'c', 'e' ], 'rotated reopened')
 
-            await writeahead.shift()
+            await writeahead.shift(Fracture.stack())
 
             {
                 gathered.length = 0
@@ -244,7 +247,7 @@ require('proof')(8, async okay => {
 
             okay(gathered, [ 'e' ], 'shifted reopened')
 
-            await writeahead.shift()
+            await writeahead.shift(Fracture.stack())
 
             {
                 gathered.length = 0
@@ -255,10 +258,10 @@ require('proof')(8, async okay => {
 
             okay(gathered, [], 'shifted to empty')
 
-            await writeahead.shift()
+            await writeahead.shift(Fracture.stack())
 
             // Rotate when there is no log.
-            await writeahead.rotate()
+            await writeahead.rotate(Fracture.stack())
 
             destructible.destroy()
         })
