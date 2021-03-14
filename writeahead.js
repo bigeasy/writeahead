@@ -259,7 +259,7 @@ class WriteAhead {
                     const gathered = []
                     for (const value of write.values) {
                         gathered.push(value.blocks)
-                        entry.blocks = []
+                        value.blocks = []
                     }
                     for (const blocks of gathered) {
                         await this._write(blocks)
