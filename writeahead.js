@@ -65,7 +65,7 @@ class WriteAhead {
         this.destructible.destruct(() => this.deferrable.decrement())
         this.deferrable.destruct(() => {
             this.deferrable.ephemeral($ => $(), 'shutdown', async () => {
-                await this.destructible.copacetic('drain', null, async () => this._fracture.drain())
+                await this._fracture.drain()
                 this._fracture.deferrable.decrement()
                 if (this._open != null) {
                     const open = this._open
@@ -236,67 +236,65 @@ class WriteAhead {
     }
 
     async _background ({ canceled, key, value, pause }) {
-        await this.deferrable.copacetic($ => $(), 'write', null, async () => {
-            switch (key) {
-            case 'write': {
-                    await this._write(value.blocks)
-                    if (value.sync) {
-                        await this.sync.sync(this._open)
-                    }
+        switch (key) {
+        case 'write': {
+                await this._write(value.blocks)
+                if (value.sync) {
+                    await this.sync.sync(this._open)
                 }
-                break
-            case 'rotate': {
-                    const write = await pause('write')
-                    try {
-                        // Before we do anything asynchronous, we need to ensure that new
-                        // writes are queued where the new log is supposed to be.
-                        const log = {
-                            id: this._logs.length == 0 ? 0 : this._logs[this._logs.length - 1].id + 1,
-                            shifted: false,
-                            sequester: new Sequester
-                        }
-                        this._logs.push(log)
-                        this._blocks[log.id] = {}
-                        const gathered = []
-                        for (const value of write.values) {
-                            gathered.push(value.blocks)
-                            entry.blocks = []
-                        }
-                        for (const blocks of gathered) {
-                            await this._write(blocks)
-                        }
-                        this._position = 0
-                        if (this._logs.length != 1) {
-                            const open = this._open
-                            this._open = null
-                            await this.sync.sync(open)
-                            await Operation.close(open)
-                        }
-                        this._open = await Operation.open(path.join(this.directory, String(log.id)), this.sync.flag)
-                    } finally {
-                        write.resume()
-                    }
-                }
-                break
-            case 'shift': {
-                    if (this._logs.length != 0) {
-                        await this._logs[0].sequester.exclude()
-                        const log = this._logs.shift()
-                        log.shifted = true
-                        log.sequester.unlock()
-                        if (this._logs.length == 0) {
-                            const open = this._open
-                            this._open = null
-                            await this.sync.sync(open)
-                            await Operation.close(open)
-                        }
-                        const filename = path.join(this.directory, String(log.id))
-                        await WriteAhead.Error.resolve(fs.unlink(filename), 'IO_ERROR', { filename })
-                    }
-                }
-                break
             }
-        })
+            break
+        case 'rotate': {
+                const write = await pause('write')
+                try {
+                    // Before we do anything asynchronous, we need to ensure that new
+                    // writes are queued where the new log is supposed to be.
+                    const log = {
+                        id: this._logs.length == 0 ? 0 : this._logs[this._logs.length - 1].id + 1,
+                        shifted: false,
+                        sequester: new Sequester
+                    }
+                    this._logs.push(log)
+                    this._blocks[log.id] = {}
+                    const gathered = []
+                    for (const value of write.values) {
+                        gathered.push(value.blocks)
+                        entry.blocks = []
+                    }
+                    for (const blocks of gathered) {
+                        await this._write(blocks)
+                    }
+                    this._position = 0
+                    if (this._logs.length != 1) {
+                        const open = this._open
+                        this._open = null
+                        await this.sync.sync(open)
+                        await Operation.close(open)
+                    }
+                    this._open = await Operation.open(path.join(this.directory, String(log.id)), this.sync.flag)
+                } finally {
+                    write.resume()
+                }
+            }
+            break
+        case 'shift': {
+                if (this._logs.length != 0) {
+                    await this._logs[0].sequester.exclude()
+                    const log = this._logs.shift()
+                    log.shifted = true
+                    log.sequester.unlock()
+                    if (this._logs.length == 0) {
+                        const open = this._open
+                        this._open = null
+                        await this.sync.sync(open)
+                        await Operation.close(open)
+                    }
+                    const filename = path.join(this.directory, String(log.id))
+                    await WriteAhead.Error.resolve(fs.unlink(filename), 'IO_ERROR', { filename })
+                }
+            }
+            break
+        }
     }
 
     rotate (stack) {
