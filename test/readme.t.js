@@ -74,7 +74,7 @@ require('proof')(8, async okay => {
         const destructible = new Destructible('writeahead.t')
         const turnstile = new Turnstile(destructible.durable({ isolated: true }, 'turnstile'))
         const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
-        destructible.rescue($ => $(), 'writeahead', async () => {
+        destructible.ephemeral($ => $(), 'writeahead', async () => {
             //
 
             // We write out a set of keys and a buffer. (Maybe if we want this
@@ -159,7 +159,7 @@ require('proof')(8, async okay => {
         const turnstile = new Turnstile(destructible.durable({ isolated: true }, 'turnstile'))
         const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
 
-        destructible.rescue($ => $(), 'writeahead', async () => {
+        destructible.ephemeral($ => $(), 'writeahead', async () => {
             const gathered = []
             for await (const block of writeahead.get(1)) {
                 gathered.push(block.toString())
@@ -179,7 +179,7 @@ require('proof')(8, async okay => {
         const turnstile = new Turnstile(destructible.durable({ isolated: true }, 'turnstile'))
         const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
 
-        destructible.rescue($ => $(), 'writeahead', async () => {
+        destructible.ephemeral($ => $(), 'writeahead', async () => {
             await writeahead.rotate(Fracture.stack())
 
             await writeahead.write(Fracture.stack(), [{
@@ -209,7 +209,7 @@ require('proof')(8, async okay => {
         const turnstile = new Turnstile(destructible.durable({ isolated: true }, 'turnstile'))
         const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
 
-        destructible.rescue($ => $(), 'writeahead', async () => {
+        destructible.ephemeral($ => $(), 'writeahead', async () => {
             const gathered = []
             for await (const block of writeahead.get(1)) {
                 gathered.push(block.toString())
@@ -239,7 +239,7 @@ require('proof')(8, async okay => {
         const turnstile = new Turnstile(destructible.durable({ isolated: true }, 'turnstile'))
         const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
 
-        destructible.rescue($ => $(), 'writeahead', async () => {
+        destructible.ephemeral($ => $(), 'writeahead', async () => {
             const gathered = []
             for await (const block of writeahead.get(1)) {
                 gathered.push(block.toString())
