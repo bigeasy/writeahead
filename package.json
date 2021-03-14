@@ -32,7 +32,7 @@
     },
     "devDependencies":
     {
-                            "destructible":                 "7.0.0-alpha.56",
+                            "destructible":                 "7.0.0-alpha.57",
                             "proof":                        "^9.0.2",
                             "turnstile":                    "6.0.0-alpha.70"
     },
