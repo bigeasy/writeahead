@@ -26,7 +26,7 @@
                             "interrupt":                    "11.0.0-alpha.20",
                             "keyify":                       "^2.0.5",
                             "operation":                    "6.0.0-alpha.7",
-                            "perhaps":                      "0.0.6",
+                            "perhaps":                      "0.0.9",
                             "sequester":                    "2.0.0-alpha.1",
                             "transcript":                   "0.1.4"
     },
