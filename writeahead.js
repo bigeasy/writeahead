@@ -11,7 +11,6 @@ const Operation = require('operation')
 const Interrupt = require('interrupt')
 const Keyify = require('keyify')
 const Fracture = require('fracture')
-const Future = require('perhaps')
 const Sequester = require('sequester')
 
 class WriteAhead {
