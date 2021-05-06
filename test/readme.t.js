@@ -17,7 +17,7 @@ require('proof')(8, async okay => {
     const { Recorder, Player } = require('transcript')
     //
 
-    // We are going to serialize our records using a Trascript recorder with a
+    // We are going to serialize our records using a Transcript recorder with a
     // dummy checksum.
 
     //
@@ -83,7 +83,7 @@ require('proof')(8, async okay => {
             // example gets pushed to the end of the file.
 
             // The write will be an append to the write ahead file. There is no
-            // synchornization for the write, so you can only have one write at
+            // synchronization for the write, so you can only have one write at
             // a time. You can have multiple concurrent readers, however.
 
             //
