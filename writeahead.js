@@ -277,6 +277,7 @@ class WriteAhead {
             }
             break
         case 'shift': {
+                // TODO Not deleting blocks! Leak!
                 if (this._logs.length != 0) {
                     await this._logs[0].sequester.exclude()
                     const log = this._logs.shift()
