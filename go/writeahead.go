@@ -19,6 +19,7 @@ type _Write struct {
 }
 
 type _Block struct {
+    id uint64
     position uint64
     keys []string
     buffer []byte
@@ -39,7 +40,6 @@ type _BlockWrite struct {
 type _Log struct {
     id int
     shifted bool
-    lock *sync.RWMutex
     blocks map[string][]_Block
 }
 
@@ -56,7 +56,9 @@ type WriteAhead struct {
     writer chan _BlockWrite
     head *_BlockWait
     last *_BlockWait
+    lock *sync.RWMutex
     appender *_Appender
+    requests chan _Request
 }
 
 // https://stackoverflow.com/questions/3398490/checking-if-a-channel-has-a-ready-to-read-value-using-go
@@ -89,25 +91,57 @@ func _ClearWrites (writeahead *WriteAhead) {
     }
 }
 
-func NewWriteahead (directory string, checksum transcript.ChecksumFunc) *WriteAhead {
-    log := _Log{0, false, new(sync.RWMutex), make(map[string][]_Block)}
+type _Request struct {
+    method string
+    message interface{}
+}
+
+type _GetRequest struct {
+    key string
+}
+
+func Coordinator (writeahead WriteAhead, requests <-chan _Request) {
+    for request := range requests {
+        switch request.message {
+        case "get": {
+                get := request.message.(_GetRequest)
+                writeahead._Get(get.key)
+            }
+        case "write": {
+            }
+        case "rotate": {
+            }
+        case "shift": {
+            }
+        }
+    }
+}
+
+func NewWriteAhead (directory string, checksum transcript.ChecksumFunc) *WriteAhead {
+    log := _Log{0, false, make(map[string][]_Block)}
     appender := &_Appender{ 0, transcript.NewRecorder(checksum) }
     wait := &_BlockWait{}
-    return &WriteAhead{
+    writeahead := WriteAhead{
         directory: directory,
         checksum: checksum,
         logs: []_Log{ log },
         writer: make(chan _BlockWrite),
         head: wait,
         last: wait,
+        lock: new(sync.RWMutex),
         appender: appender,
+        requests: make(chan _Request),
     }
+    return &writeahead
 }
 
 func (writeahead *WriteAhead) Write (writes []Write) {
+}
+
+func (writeahead *WriteAhead) _Write (writes []Write) bool {
     log := writeahead.logs[len(writeahead.logs) - 1]
     for _, write := range writes {
-        block := _Block{0, write.keys, write.buffer}
+        block := _Block{0, 0, write.keys, write.buffer}
         for _, key := range write.keys {
             if log.blocks[key] == nil {
                 log.blocks[key] = make([]_Block, 0, 32)
@@ -121,13 +155,21 @@ func (writeahead *WriteAhead) Write (writes []Write) {
         writeahead.writes++
         writeahead.writer <- _BlockWrite{write.keys, write.buffer, position}
     }
+    return true
 }
 
-func (writeahead *WriteAhead) Get () {
+func (writeahead *WriteAhead) _Get (key string) <-chan []byte {
+    //player := transcript.NewPlayer(writeahead.checksum)
+    // Could put RWLock on each log, I think, but this is easier to understand.
+    writeahead.lock.RLock()
+    defer writeahead.lock.RUnlock()
+    //for _, log := range logs {
+    //}
+    return nil
 }
 
 func (writeahead *WriteAhead) Rotate () {
-    log := _Log{0, false, new(sync.RWMutex), make(map[string][]_Block)}
+    log := _Log{0, false, make(map[string][]_Block)}
     writeahead.logs = append(writeahead.logs, log)
 }
 

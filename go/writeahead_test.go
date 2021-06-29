@@ -8,5 +8,10 @@ import (
     "log" */
 )
 
+func NullChecksum (_ []byte) int {
+    return 0
+}
+
 func TestWriteAhead (t *testing.T) {
+    NewWriteAhead("tmp", NullChecksum)
 }
