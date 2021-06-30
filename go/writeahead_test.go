@@ -2,6 +2,7 @@ package writeahead
 
 import (
     "testing"
+    "os"
 /*    "bytes"
     "encoding/gob"
     "fmt"
@@ -13,5 +14,7 @@ func NullChecksum (_ []byte) int {
 }
 
 func TestWriteAhead (t *testing.T) {
+    os.RemoveAll("tmp")
+    _ = os.Mkdir("tmp", 0755)
     NewWriteAhead("tmp", NullChecksum)
 }

@@ -2,9 +2,15 @@ package writeahead
 
 import (
     transcript "github.com/bigeasy/transcript/go"
+    "path"
+    "sort"
+    "strconv"
+    "regexp"
+    "io/ioutil"
     "sync"
-//    "github.com/google/vectorio"
     "encoding/json"
+    "os"
+    "fmt"
 )
 
 type Write struct {
@@ -19,10 +25,17 @@ type _Write struct {
 }
 
 type _Block struct {
+    next *_Block
     id uint64
     position uint64
     keys []string
     buffer []byte
+}
+
+type _BlockList struct {
+    length int
+    head *_Block
+    tail *_Block
 }
 
 type _BlockWait struct {
@@ -41,9 +54,11 @@ type _Log struct {
     id int
     shifted bool
     blocks map[string][]_Block
+    _blocks map[string]*_BlockList
 }
 
 type _Appender struct {
+    file *os.File
     position uint64
     recorder *transcript.Recorder
 }
@@ -64,25 +79,27 @@ type WriteAhead struct {
 // https://stackoverflow.com/questions/3398490/checking-if-a-channel-has-a-ready-to-read-value-using-go
 // https://stackoverflow.com/questions/33328000/reading-multiple-elements-from-a-channel-in-go
 func _WriteAhead (appender *_Appender, writes <-chan _BlockWrite) {
-    blocks := make([]_BlockWrite, 0, 32)
+    blockWrites := make([]_BlockWrite, 0, 32)
     for first := range writes {
-        blocks = append(blocks, first)
-        GATHER: for len(blocks) != cap(blocks) {
+        blockWrites = append(blockWrites, first)
+        GATHER: for len(blockWrites) != cap(blockWrites) {
             select {
             case next := <-writes:
-                blocks = append(blocks, next)
+                blockWrites = append(blockWrites, next)
             default:
                 break GATHER
             }
         }
-        buffers := make([][]byte, len(blocks))
-        positions := make([]uint64, len(blocks))
-        for i, block := range blocks {
+        buffers := make([][]byte, len(blockWrites))
+        positions := make([]uint64, len(blockWrites))
+        for i, block := range blockWrites {
             keys, _ := json.Marshal(block.keys)
             buffers[i] = appender.recorder.Record([][][]byte{ [][]byte{ keys, block.buffer } })
             positions[i] = appender.position
+            appender.position += uint64(len(buffers[i]))
     //        block := _Block{write.keys, buffers[i], writeahead.position}
         }
+        //bytes, err := vectorio.Writev(f, buffers)
     }
 }
 
@@ -100,6 +117,13 @@ type _GetRequest struct {
     key string
 }
 
+type _WriteRequest struct {
+    keys []string
+    buffer []byte
+    enqueued chan bool
+    written chan bool
+}
+
 func Coordinator (writeahead WriteAhead, requests <-chan _Request) {
     for request := range requests {
         switch request.message {
@@ -108,6 +132,7 @@ func Coordinator (writeahead WriteAhead, requests <-chan _Request) {
                 writeahead._Get(get.key)
             }
         case "write": {
+                writeahead._Write(request.message.(_WriteRequest))
             }
         case "rotate": {
             }
@@ -117,14 +142,32 @@ func Coordinator (writeahead WriteAhead, requests <-chan _Request) {
     }
 }
 
-func NewWriteAhead (directory string, checksum transcript.ChecksumFunc) *WriteAhead {
-    log := _Log{0, false, make(map[string][]_Block)}
-    appender := &_Appender{ 0, transcript.NewRecorder(checksum) }
+func NewWriteAhead (directory string, checksum transcript.ChecksumFunc) (*WriteAhead, error) {
+    files, err := ioutil.ReadDir(directory)
+    if err != nil {
+        return nil, err
+    }
+    logs := make([]_Log, 0, 16)
+    digits, _ := regexp.Compile("^\\d+$")
+    fmt.Fprintf(os.Stdout, "here %d \n", len(files))
+    ids := make([]int, 0, len(files))
+    for _, file := range files {
+        if ! digits.MatchString(file.Name()) {
+            continue
+        }
+        id, _ := strconv.Atoi(file.Name())
+        ids = append(ids, id)
+    }
+    sort.Ints(ids)
+    if len(logs) == 0 {
+        logs = append(logs, _Log{0, false, make(map[string][]_Block), make(map[string]*_BlockList)})
+    }
+    appender := &_Appender{ nil, 0, transcript.NewRecorder(checksum) }
     wait := &_BlockWait{}
     writeahead := WriteAhead{
         directory: directory,
         checksum: checksum,
-        logs: []_Log{ log },
+        logs: logs,
         writer: make(chan _BlockWrite),
         head: wait,
         last: wait,
@@ -132,30 +175,52 @@ func NewWriteAhead (directory string, checksum transcript.ChecksumFunc) *WriteAh
         appender: appender,
         requests: make(chan _Request),
     }
-    return &writeahead
-}
-
-func (writeahead *WriteAhead) Write (writes []Write) {
-}
-
-func (writeahead *WriteAhead) _Write (writes []Write) bool {
-    log := writeahead.logs[len(writeahead.logs) - 1]
-    for _, write := range writes {
-        block := _Block{0, 0, write.keys, write.buffer}
-        for _, key := range write.keys {
-            if log.blocks[key] == nil {
-                log.blocks[key] = make([]_Block, 0, 32)
-            }
-            log.blocks[key] = append(log.blocks[key], block)
-        }
-        position := make(chan uint64, 1)
-        blockWait := _BlockWait{position: position, block: &block}
-        writeahead.last.next = &blockWait
-        writeahead.last = &blockWait
-        writeahead.writes++
-        writeahead.writer <- _BlockWrite{write.keys, write.buffer, position}
+    log := logs[len(logs) - 1]
+    filename := path.Join(directory, strconv.Itoa(log.id))
+    f, err := os.OpenFile(filename, os.O_CREATE | os.O_APPEND, 0644)
+    if err != nil {
+        return nil, err
     }
-    return true
+    stat, err := f.Stat()
+    if err != nil {
+        return nil, err
+    }
+    writeahead.appender.position = stat.Size()
+    return &writeahead, nil
+}
+
+func (writeahead *WriteAhead) Write (keys []string, buffer []byte) chan bool {
+    write := _WriteRequest{keys, buffer, make(chan bool, 1), make(chan bool, 1)}
+    writeahead.requests <- _Request{"write", write}
+    <-write.enqueued
+    return write.written
+}
+
+func (writeahead *WriteAhead) _Write (write _WriteRequest) {
+    log := writeahead.logs[len(writeahead.logs) - 1]
+    block := _Block{nil, 0, 0, write.keys, write.buffer}
+    for _, key := range write.keys {
+        var list *_BlockList
+        if log._blocks[key] == nil {
+            list = &_BlockList{}
+            log._blocks[key] = list
+            list.length = 1
+            list.head = &block
+            list.tail = &block
+        } else {
+            list = log._blocks[key]
+            list.length++
+            list.tail.next = &block
+            list.tail = &block
+        }
+    }
+    position := make(chan uint64, 1)
+    blockWait := _BlockWait{position: position, block: &block}
+    writeahead.last.next = &blockWait
+    writeahead.last = &blockWait
+    writeahead.writes++
+    writeahead.writer <- _BlockWrite{write.keys, write.buffer, position}
+    write.enqueued <-true
 }
 
 func (writeahead *WriteAhead) _Get (key string) <-chan []byte {
@@ -169,7 +234,7 @@ func (writeahead *WriteAhead) _Get (key string) <-chan []byte {
 }
 
 func (writeahead *WriteAhead) Rotate () {
-    log := _Log{0, false, make(map[string][]_Block)}
+    log := _Log{0, false, make(map[string][]_Block), make(map[string]*_BlockList)}
     writeahead.logs = append(writeahead.logs, log)
 }
 
