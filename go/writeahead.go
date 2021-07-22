@@ -27,7 +27,7 @@ type _Write struct {
 type _Block struct {
     next *_Block
     id uint64
-    position uint64
+    position int64
     keys []string
     buffer []byte
 }
@@ -40,14 +40,14 @@ type _BlockList struct {
 
 type _BlockWait struct {
     next *_BlockWait
-    position chan uint64
+    position chan int64
     block *_Block
 }
 
 type _BlockWrite struct {
     keys []string
     buffer []byte
-    position chan uint64
+    position chan int64
 }
 
 type _Log struct {
@@ -59,7 +59,7 @@ type _Log struct {
 
 type _Appender struct {
     file *os.File
-    position uint64
+    position int64
     recorder *transcript.Recorder
 }
 
@@ -91,12 +91,12 @@ func _WriteAhead (appender *_Appender, writes <-chan _BlockWrite) {
             }
         }
         buffers := make([][]byte, len(blockWrites))
-        positions := make([]uint64, len(blockWrites))
+        positions := make([]int64, len(blockWrites))
         for i, block := range blockWrites {
             keys, _ := json.Marshal(block.keys)
             buffers[i] = appender.recorder.Record([][][]byte{ [][]byte{ keys, block.buffer } })
             positions[i] = appender.position
-            appender.position += uint64(len(buffers[i]))
+            appender.position += int64(len(buffers[i]))
     //        block := _Block{write.keys, buffers[i], writeahead.position}
         }
         //bytes, err := vectorio.Writev(f, buffers)
@@ -177,15 +177,17 @@ func NewWriteAhead (directory string, checksum transcript.ChecksumFunc) (*WriteA
     }
     log := logs[len(logs) - 1]
     filename := path.Join(directory, strconv.Itoa(log.id))
-    f, err := os.OpenFile(filename, os.O_CREATE | os.O_APPEND, 0644)
+    file, err := os.OpenFile(filename, os.O_CREATE | os.O_APPEND, 0644)
     if err != nil {
         return nil, err
     }
-    stat, err := f.Stat()
+    stat, err := file.Stat()
     if err != nil {
         return nil, err
     }
     writeahead.appender.position = stat.Size()
+    writeahead.appender.file = file
+    fmt.Fprintf(os.Stdout, "position %d \n", writeahead.appender.position)
     return &writeahead, nil
 }
 
@@ -214,7 +216,7 @@ func (writeahead *WriteAhead) _Write (write _WriteRequest) {
             list.tail = &block
         }
     }
-    position := make(chan uint64, 1)
+    position := make(chan int64, 1)
     blockWait := _BlockWait{position: position, block: &block}
     writeahead.last.next = &blockWait
     writeahead.last = &blockWait
