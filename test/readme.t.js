@@ -42,7 +42,9 @@ require('proof')(8, async okay => {
     //
     const directory = path.join(__dirname, 'tmp', 'writeahead')
 
-    await fs.rmdir(directory, { recursive: true })
+    const { coalesce } = require('extant')
+
+    await coalesce(fs.rm, fs.rmdir).call(fs, directory, { force: true, recursive: true })
     await fs.mkdir(directory, { recursive: true })
     //
 
