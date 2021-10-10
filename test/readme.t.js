@@ -190,7 +190,7 @@ require('proof')(6, async okay => {
     //
     // The `write` method of `WriteAhead` is synchronous, even though it is an `async`
     // function, the initial write is to an in memory queue and the writes are
-    // immediately available when the `write` function returns its `Promsie`.
+    // immediately available when the `write` function returns its `Promise`.
     //
     // This means that you can use a single write-ahead log in your program. All the
     // writes will be ordered in the order in which the `write` method was called.
