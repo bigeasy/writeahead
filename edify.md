@@ -18,6 +18,7 @@ A write-ahead log.
 WriteAhead installs from NPM.
 
 ```
+//{ "mode": "text" }
 npm install writeahead
 ```
 
@@ -29,18 +30,26 @@ Proof `okay` function to assert out statements in the readme. A Proof unit test
 generally looks like this.
 
 ```javascript
-require('proof')(4, async okay => {
-    okay('always okay')
-    okay(true, 'okay if true')
-    okay(1, 1, 'okay if equal')
-    okay({ value: 1 }, { value: 1 }, 'okay if deep strict equal')
+//{ "code": { "tests": 6 }, "text": { "tests": 4  } }
+require('proof')(%(tests)d, async okay => {
+    //{ "include": "test", "mode": "code" }
+    //{ "include": "proof" }
 })
+```
+
+```javascript
+//{ "name": "proof", "mode": "text" }
+okay('always okay')
+okay(true, 'okay if true')
+okay(1, 1, 'okay if equal')
+okay({ value: 1 }, { value: 1 }, 'okay if deep strict equal')
 ```
 
 You can run this unit test yourself to see the output from the various
 code sections of the readme.
 
 ```text
+//{ "mode": "text" }
 git clone git@github.com:bigeasy/writeahead.git
 cd writeahead
 npm install --no-package-lock --no-save
@@ -49,10 +58,35 @@ node test/readme.t.js
 
 ## Overview
 
+
+```javascript
+//{ "name": "test", "mode": "code" }
+// This will not appear in `README.md`.
+
+// As noted, this `README.md` is also a unit test. We need a temporary directory
+// to store our write-ahead log for the unit test. We delete it and recreate it
+// on every run of the test.
+
+// Node.js file system and file path APIs.
+const path = require('path')
+const fs = require('fs').promises
+
+// Our directory will live under our test directory.
+const directory = path.join(__dirname, 'tmp', 'writeahead')
+
+// Remove the existing directory recursively with a hack to accommodate Node.js
+// file system API deprecations.
+await (fs.rm || fs.rmdir).call(fs, directory, { force: true, recursive: true })
+
+// Create the temporary directory.
+await fs.mkdir(directory, { recursive: true })
+```
+
 WriteAhead exports a single `WriteAhead` class.
 
 ```javascript
-const WriteAhead = require('writeahead')
+//{ "name": "test", "code": { "path": "'..'" }, "text": { "path": "'writeahead'" } }
+const WriteAhead = require(%(path)s)
 ```
 
 WriteAhead is designed to be used in concert with the structure concurrency
@@ -66,9 +100,17 @@ these libraries. You need to require them into your module but then you'll use
 them according to a boilerplate.
 
 ```javascript
+//{ "name": "test" }
 const Turnstile = require('turnstile')
 const Fracture = require('fracture')
 const Destructible = require('destructible')
+```
+
+```javascript
+//{ "name": "test", "mode": "code" }
+{
+    //{ "include": "first" }
+}
 ```
 
 A `WriteAhead` instance requires and instance of `Destructible` and `Turnstile`.
@@ -80,6 +122,7 @@ The `WriteAhead` construction is itself a two step process of creating an
 `opening` instance that is used to construct the `WriteAhead` object.
 
 ```javascript
+//{ "name": "first" }
 const path = require('path')
 
 const destructible = new Destructible('writeahead.t')
@@ -88,6 +131,16 @@ const turnstile = new Turnstile(destructible.durable('turnstile'))
 const open = await WriteAhead.open({ directory: path.join(__dirname, 'tmp', 'writeahead') })
 const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
 
+//{ "include": "first.strand" }
+```
+
+```javascript
+//{ "name": "first.strand", "mode": "code" }
+destructible.ephemeral($ => $(), 'writeahead', async () => {
+    //{ "include": "first.body" }
+})
+
+await destructible.promise
 ```
 
 The first argument to 'writeahead.write` is a Fracture stack which you can
@@ -103,6 +156,7 @@ entries are synced to the underlying storage medium when the `write` function
 returns.
 
 ```javascript
+//{ "name": "first.body" }
 const entries = [{
     keys: [ 0, 1 ],
     buffer: Buffer.from('a')
@@ -128,6 +182,7 @@ entries that match a given key in the order in which they were written to the
 write-ahead log.
 
 ```javascript
+//{ "name": "first.body" }
 const gathered = []
 for await (const block of writeahead.get(1)) {
     gathered.push(block.toString())
@@ -160,6 +215,7 @@ of the `Destructible` used to create the `Turnstile` and `WriteAhead`. It will
 wait for any queue writes to flush and close the write-ahead log.
 
 ```javascript
+//{ "name": "first.body" }
 destructible.destroy()
 ```
 
@@ -169,19 +225,33 @@ Reopening a write-ahead log is the same as creating it for the first time. Here
 we reopen the write-ahead log we created above.
 
 ```javascript
-const path = require('path')
+//{ "unblock": true, "name": "test" }
+{
+    const path = require('path')
 
-const destructible = new Destructible('writeahead.t')
-const turnstile = new Turnstile(destructible.durable('turnstile'))
+    const destructible = new Destructible('writeahead.t')
+    const turnstile = new Turnstile(destructible.durable('turnstile'))
 
-const open = await WriteAhead.open({ directory: path.join(__dirname, 'tmp', 'writeahead') })
-const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
+    const open = await WriteAhead.open({ directory: path.join(__dirname, 'tmp', 'writeahead') })
+    const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
 
+    //{ "include": "reopen.test" }
+}
+```
+
+```javascript
+//{ "name": "reopen.test", "mode": "code" }
+destructible.ephemeral($ => $(), 'writeahead', async () => {
+    //{ "include": "reopen.body" }
+})
+
+await destructible.promise
 ```
 
 The records we wrote above are still there.
 
 ```javascript
+//{ "name": "reopen.body" }
 const gathered = []
 for await (const block of writeahead.get(1)) {
     gathered.push(block.toString())
@@ -193,6 +263,7 @@ okay(gathered, [ 'a', 'c' ], 'read from reopened file')
 Don't forge to close the write-ahead log when you're done with it.
 
 ```javascript
+//{ "name": "reopen.body" }
 destructible.destroy()
 ```
 
@@ -208,21 +279,36 @@ There will be no interleaved writes.
 
 Let's reopen our write-ahead log again.
 
+
 ```javascript
-const path = require('path')
+//{ "unblock": true, "name": "test" }
+{
+    const path = require('path')
 
-const destructible = new Destructible('writeahead.t')
-const turnstile = new Turnstile(destructible.durable('turnstile'))
+    const destructible = new Destructible('writeahead.t')
+    const turnstile = new Turnstile(destructible.durable('turnstile'))
 
-const open = await WriteAhead.open({ directory: path.join(__dirname, 'tmp', 'writeahead') })
-const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
+    const open = await WriteAhead.open({ directory: path.join(__dirname, 'tmp', 'writeahead') })
+    const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
 
+    //{ "include": "concurrency.test" }
+}
+```
+
+```javascript
+//{ "name": "concurrency.test", "mode": "code" }
+destructible.ephemeral($ => $(), 'writeahead', async () => {
+    //{ "include": "concurrency.body" }
+})
+
+await destructible.promise
 ```
 
 Now we write to the write ahead log but we do not await the returned `Promise`.
 We hold onto it for a bit.
 
 ```javascript
+//{ "name": "concurrency.body" }
 const entries = [{
     keys: [ 0 ],
     buffer: Buffer.from('d')
@@ -241,6 +327,7 @@ asynchronous write to the file and that cannot be performed until we `await` the
 Promise.
 
 ```javascript
+//{ "name": "concurrency.body" }
 const gathered = []
 for await (const block of writeahead.get(1)) {
     gathered.push(block.toString())
@@ -253,6 +340,7 @@ Of course, the written buffers will also be there after we `await` the `Promise`
 returned from `write`.
 
 ```javascript
+//{ "name": "concurrency.body" }
 await promise
 
 gathered.length = 0
@@ -267,6 +355,7 @@ TODO Maybe don't open and close so much? It may make the documentation easier to
 follow.
 
 ```javascript
+//{ "name": "concurrency.body" }
 destructible.destroy()
 ```
 
@@ -279,25 +368,40 @@ written.
 Let's reopen our write-ahead log again.
 
 ```javascript
-const path = require('path')
+//{ "unblock": true, "name": "test" }
+{
+    const path = require('path')
 
-const destructible = new Destructible('writeahead.t')
-const turnstile = new Turnstile(destructible.durable('turnstile'))
+    const destructible = new Destructible('writeahead.t')
+    const turnstile = new Turnstile(destructible.durable('turnstile'))
 
-const open = await WriteAhead.open({ directory: path.join(__dirname, 'tmp', 'writeahead') })
-const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
+    const open = await WriteAhead.open({ directory: path.join(__dirname, 'tmp', 'writeahead') })
+    const writeahead = new WriteAhead(destructible.durable('writeahead'), turnstile, open)
 
+    //{ "include": "rotate.test" }
+}
+```
+
+```javascript
+//{ "name": "rotate.test", "mode": "code" }
+destructible.ephemeral($ => $(), 'writeahead', async () => {
+    //{ "include": "rotate.body" }
+})
+
+await destructible.promise
 ```
 
 Rotate.
 
 ```javascript
+//{ "name": "rotate.body" }
 await writeahead.rotate(Fracture.stack())
 ```
 
 Write to rotate.
 
 ```javascript
+//{ "name": "rotate.body" }
 const writes = [{
     keys: [ 1 ],
     buffer: Buffer.from('f')
@@ -312,6 +416,7 @@ await writeahead.write(Fracture.stack(), writes, true)
 Everything is still there.
 
 ```javascript
+//{ "name": "rotate.body" }
 const gathered = []
 for await (const block of writeahead.get(1)) {
     gathered.push(block.toString())
@@ -323,12 +428,14 @@ okay(gathered, [ 'a', 'c', 'e', 'f' ], 'added after rotate')
 Now we can shift.
 
 ```javascript
+//{ "name": "rotate.body" }
 await writeahead.shift(Fracture.stack())
 ```
 
 Everything before the rotate is gone.
 
 ```javascript
+//{ "name": "rotate.body" }
 gathered.length = 0
 for await (const block of writeahead.get(1)) {
     gathered.push(block.toString())
@@ -340,6 +447,7 @@ okay(gathered, [ 'f' ], 'vacuumed after shift')
 Let's close our write-ahead log.
 
 ```javascript
+//{ "name": "rotate.body" }
 destructible.destroy()
 ```
 
