@@ -58,7 +58,6 @@ node test/readme.t.js
 
 ## Overview
 
-
 ```javascript
 //{ "name": "test", "mode": "code" }
 // This will not appear in `README.md`.
