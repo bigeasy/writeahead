@@ -138,8 +138,7 @@ class WriteAhead {
         const filename = path.join(directory, String(log.id))
         const stat = await WriteAhead.Error.resolve(fs.stat(filename), 'IO_ERROR', { filename })
         const position = stat.size
-        const handle = await WriteAhead.Error.resolve(fs.open(filename, 'a'), 'IO_ERROR', { filename })
-        const open = { handle, properties: { filename } }
+        const open = await Operation.open(filename, sync.flag)
         return { directory, logs, checksum, blocks, open, position, sync }
     }
     //
@@ -277,6 +276,7 @@ class WriteAhead {
             }
             break
         case 'shift': {
+                // TODO Not deleting blocks! Leak!
                 if (this._logs.length != 0) {
                     await this._logs[0].sequester.exclude()
                     const log = this._logs.shift()

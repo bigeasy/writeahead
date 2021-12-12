@@ -1,0 +1,12 @@
+github.com/bigeasy/transcript/go v0.0.1 h1:0EvvC6+zfJ5PzdzfY4THTHyfon//mNv2N7pAOGAp/os=
+github.com/bigeasy/transcript/go v0.0.1/go.mod h1:i8LxSAL0MfTohK4RbKzn8PvhoOGSNkLd+0EDCPYvhi8=
+github.com/bigeasy/transcript/go v0.0.2 h1:O6OcocOiR4vwDuuLhSHX+F+y9RVl5Gw5z7sqe/z1SLE=
+github.com/bigeasy/transcript/go v0.0.2/go.mod h1:i8LxSAL0MfTohK4RbKzn8PvhoOGSNkLd+0EDCPYvhi8=
+github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/google/vectorio v0.0.0-20160107201919-f555dd215279 h1:27CsgDou3Kqs/KRA2mjg78FceTTuKhVpF2mJNdL2qt8=
+github.com/google/vectorio v0.0.0-20160107201919-f555dd215279/go.mod h1:4HpdkvR1ff869/vF28cUQKZYYk1K2HzEpOssA95dsOM=
+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
+github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
