@@ -25,7 +25,7 @@
                             "fracture":                     "0.3.0-alpha.74",
                             "interrupt":                    "11.0.0-alpha.25",
                             "keyify":                       "^3.0.0",
-                            "operation":                    "6.0.0-alpha.12",
+                            "operation":                    "6.0.0-alpha.13",
                             "sequester":                    "2.0.0-alpha.3",
                             "transcript":                   "0.1.7"
     },
